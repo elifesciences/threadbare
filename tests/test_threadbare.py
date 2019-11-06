@@ -47,6 +47,7 @@ def test_uncontrolled_state_modification():
     assert env == {'foo': {'bar': 'bop'}}
 
 def test_settings_closure():
+    "access to an enclosed state dictionary without reference to the original is still possible"
     enclosed = partial(settings, {})
     with enclosed(foo='bar') as env:
         assert env == {'foo': 'bar'}
@@ -54,3 +55,11 @@ def test_settings_closure():
             assert env2 == {'foo': 'bar', 'baz': 'bop'}
             assert env == {'foo': 'bar', 'baz': 'bop'}
         assert env == {'foo': 'bar'}
+
+def test_settings_nested_closure():
+    "state dictionary reference provided in nested scopes is preserved"
+    env = {}
+    enclosed = partial(settings, env)
+    with enclosed(foo='bar'):
+        with enclosed(baz='bop') as env2:
+            assert env == env2 == {'foo':'bar','baz':'bop'}
