@@ -1,3 +1,4 @@
 #!/bin/bash
 set -e
-PYTHONPATH=threadbare/ python -m pytest tests/ -v
+source venv/bin/activate
+PYTHONPATH=threadbare/ python -m pytest tests/ -vv

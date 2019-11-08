@@ -63,3 +63,31 @@ def test_settings_nested_closure():
     with enclosed(foo='bar'):
         with enclosed(baz='bop') as env2:
             assert env == env2 == {'foo':'bar','baz':'bop'}
+    assert env == {}
+
+# 
+
+def test_parallel_wrapper():
+    env = {}
+    def fn():
+        pass
+    wrapped_func = threadbare.parallel(env, fn)
+    assert hasattr(wrapped_func, 'parallel')
+    assert wrapped_func.parallel
+    assert hasattr(wrapped_func, 'pool_size')
+
+def test_execute():
+    env = {}
+    def fn():
+        return "hello, world"
+    expected = ["hello, world"]
+    assert expected == threadbare.execute(env, fn)
+
+def test_execute_many():
+    env = {}
+    def fn():
+        return "foo"
+    pool_size = 10
+    parallel_fn = threadbare.parallel(env, fn, pool_size=pool_size)
+    expected = ["foo"] * pool_size
+    assert expected == threadbare.execute(env, parallel_fn)
