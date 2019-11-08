@@ -90,15 +90,16 @@ def test_execute_many_serial():
     expected = ["foo"]
     assert expected == threadbare.execute(env, fn)
 
-def test_execute_many_serial_params():
+def test_execute_many_serial_with_params():
+    # note: test emulates Fabric's global `_env` dictionary
     def fn():
         with settings() as env:
-            return "foo" + str(env['key'])
+            return "foo" + env['mykey']
     expected = ["foobar", "foobaz", "foobop"]
-    local_env = None # emulates Fabric's global `_env` dictionary, but less than ideal
-    assert expected == threadbare.execute(local_env, fn, param_key="key", param_values=["bar", "baz", "bop"])
+    local_env = None # use global env :(
+    assert expected == threadbare.execute(local_env, fn, param_key="mykey", param_values=["bar", "baz", "bop"])
 
-def test_execute_many_parallel():
+def test_execute_many_parallel_no_params():
     env = {}
     def fn():
         return "foo"
@@ -106,3 +107,13 @@ def test_execute_many_parallel():
     parallel_fn = threadbare.parallel(env, fn, pool_size=pool_size)
     expected = ["foo"] * pool_size
     assert expected == threadbare.execute(env, parallel_fn)
+
+def test_execute_many_parallel_with_params():
+    def fn():
+        with settings() as env:
+            print('env:',env)
+            return env['mykey']
+    env = {'parent': 'environment'}
+    parallel_fn = threadbare.parallel(env, fn)
+    expected = ["foo", "bar", "baz"] # todo: failing, results are unordered
+    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=["bar", "baz", "bop"])

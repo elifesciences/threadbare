@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import uuid
 import contextlib
 from multiprocessing import Process, Queue
@@ -31,18 +32,32 @@ def parallel(env, func, pool_size=None):
     # https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
 
     def inner(*args, **kwargs):
+        # wrap this in a `settings` with given env? otherwise, why are we passing env?
         return func(*args, **kwargs)
 
     inner.parallel = True # `func` *must* be forced to run in parallel to main process
-    inner.pool_size = pool_size if pool_size else None # when None, executor decides how many instances of `func` to execute
+
+    # when None, executor decides how many instances of `func` to execute (1, probably)
+    # if set and executor is given a set of values to use instead, `pool_size` is ignored
+    inner.pool_size = pool_size if pool_size else None 
     
     return inner
 
-def _execute(env, func, name, queue):
-    result = func()
-    queue.put({'name': name, 'result': result})
-    return result
+def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
+    try:
+        # Fabric is nuking the child process's env dictionary
+        # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L229-L237
 
+        # what we can do is say that worker functions executed in parallel must use the
+        # implicit `settings() as env` invocation rather than `settings(env)` as we have
+        # no reference to `env` unless the worker function accepts it as a parameter.
+        # and we can't rely on that.
+        if env:
+            ENV.update(env)
+        result = worker_func()
+        queue.put({'name': name, 'result': result})
+    except BaseException as unhandled_exception:
+        queue.put({'name': name, 'result': unhandled_exception})
 
 def unique_id():
     return str(uuid.uuid4())
@@ -60,15 +75,20 @@ def _parallel_execution(env, func, param_key, param_values):
     results_q = Queue()
     kwargs = {
         'env': env,
-        'func': func,
+        'worker_func': func,
         #'name': None, # a name is assigned on process start
         'queue': results_q,
     }
-    pool_size = getattr(func, 'pool_size', 1)
+    pool_values = param_values or range(0, getattr(func, 'pool_size', 1))
+        
     pool = []
-    for n in range(0, pool_size):
-        kwargs['name'] = unique_id()
-        p = Process(name=kwargs['name'], target=_execute, kwargs=kwargs)
+    for idx, n in enumerate(pool_values):
+        kwargs['name'] = 'process--' + str(idx + 1) # process--1, process--2
+        new_env = env.copy()
+        if n:
+            new_env[param_key] = n
+        kwargs['env'] = new_env
+        p = Process(name=kwargs['name'], target=_parallel_execution_worker_wrapper, kwargs=kwargs)
         p.start()
         pool.append(p)
         
@@ -149,9 +169,14 @@ def execute(env, func, param_key=None, param_values=None):
     if (param_key and not param_values) or \
        (not param_key and param_values):
         raise ValueException("either a `param_key` AND `param_values` are provided OR neither are provided")
+
+    if param_values and not isinstance(param_values, Iterable):
+        raise ValueError("given value for `param_values` must be an iterable type, not %r" % type(param_values))
+
+    if param_key and not isinstance(param_key, str):
+        raise ValueError("given value for `param_key` must be a valid function parameter key")
     
     if hasattr(func, 'parallel') and func.parallel:
         result_list = _parallel_execution(env, func, param_key, param_values)
-        print(result_list)
         return [result['result'] for result in result_list]
     return _serial_execution(env, func, param_key, param_values)
