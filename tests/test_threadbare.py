@@ -83,11 +83,26 @@ def test_execute():
     expected = ["hello, world"]
     assert expected == threadbare.execute(env, fn)
 
-def test_execute_many():
+def test_execute_many_serial():
     env = {}
     def fn():
         return "foo"
-    pool_size = 10
+    expected = ["foo"]
+    assert expected == threadbare.execute(env, fn)
+
+def test_execute_many_serial_params():
+    def fn():
+        with settings() as env:
+            return "foo" + str(env['key'])
+    expected = ["foobar", "foobaz", "foobop"]
+    local_env = None # emulates Fabric's global `_env` dictionary, but less than ideal
+    assert expected == threadbare.execute(local_env, fn, param_key="key", param_values=["bar", "baz", "bop"])
+
+def test_execute_many_parallel():
+    env = {}
+    def fn():
+        return "foo"
+    pool_size = 3
     parallel_fn = threadbare.parallel(env, fn, pool_size=pool_size)
     expected = ["foo"] * pool_size
     assert expected == threadbare.execute(env, parallel_fn)
