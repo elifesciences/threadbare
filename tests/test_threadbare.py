@@ -161,6 +161,27 @@ def test_execute_many_parallel_with_params():
                 {'parent': 'environment', "mykey": 3}]
     assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=[1, 2, 3])
 
+def test_execute_many_parallel_raw_results():
+    def fn():
+        with settings() as env:
+            return env
+    env = {'parent': 'environment'}
+    parallel_fn = threadbare.parallel(fn)
+    param_key = 'mykey'
+    param_values = [1, 2, 3]
+    expected = [
+        {'pid': 28000, 'name': 'process--1', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 1}},
+        {'pid': 28000, 'name': 'process--2', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 2}},
+        {'pid': 28000, 'name': 'process--3', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 3}}]
+    results = threadbare._parallel_execution(env, parallel_fn, param_key, param_values)
+
+    def update(d, k, v):
+        d[k] = v
+        return d
+
+    results = [update(result, 'pid', 28000) for result in expected]
+    assert expected == results
+
 def test_parallel_terminate():
     "when a process is terminated, ensure internal state is what we expect it to be"
     def fn():
