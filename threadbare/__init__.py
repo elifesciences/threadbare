@@ -19,17 +19,17 @@ def settings(state=None, **kwargs):
         state = ENV
     if not isinstance(state, dict):
         raise TypeError("state map must be a dictionary-like object, not %r" % type(state))
-    original = {}
+    original_values = {}
     for key, val in kwargs.items():
         if key in state:
-            original[key] = state[key]
+            original_values[key] = state[key]
         state[key] = val
     try:
         yield state
     finally:
         for key, val in kwargs.items():
-            if key in original:
-                state[key] = original[key]
+            if key in original_values:
+                state[key] = original_values[key]
             else:
                 del state[key]
 

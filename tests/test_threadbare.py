@@ -37,6 +37,14 @@ def test_overridden_state():
         assert env == {'foo': 'baz'}
     assert env == {'foo': 'bar'}
 
+def test_deleted_state():
+    env = {'foo': 'bar'}
+    with settings(env) as newenv:
+        del env['foo']
+        assert env == {}
+    # `settings` is nothing more than a fancy wrapper around the original reference and is NOT a copy
+    assert env == {} # still empty
+
 def test_nested_state_initial_state():
     "state is returned to initial conditions"
     env = {'foo': 'bar'}
