@@ -1,8 +1,15 @@
 from collections.abc import Iterable
-import uuid
 import contextlib
 from multiprocessing import Process, Queue
 import os, time
+
+def first(x):
+    try:
+        return x[0]
+    except (KeyError, ValueError, TypeError):
+        return None
+
+#
 
 ENV = {}
 
@@ -58,9 +65,6 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         queue.put({'name': name, 'result': result})
     except BaseException as unhandled_exception:
         queue.put({'name': name, 'result': unhandled_exception})
-
-def unique_id():
-    return str(uuid.uuid4())
 
 def _parallel_execution(env, func, param_key, param_values):
 
@@ -129,7 +133,8 @@ def _parallel_execution(env, func, param_key, param_values):
         job_name = job_result['name']
         result_map[job_name]['result'] = job_result['result']
 
-    return list(result_map.values())
+    # sort the results, drop the process name
+    return [b for a, b in sorted(result_map.items(), key=first)]
 
 def _serial_execution(env, func, param_key, param_values):
     result_list = []

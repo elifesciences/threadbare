@@ -111,9 +111,8 @@ def test_execute_many_parallel_no_params():
 def test_execute_many_parallel_with_params():
     def fn():
         with settings() as env:
-            print('env:',env)
             return env['mykey']
     env = {'parent': 'environment'}
     parallel_fn = threadbare.parallel(env, fn)
     expected = ["foo", "bar", "baz"] # todo: failing, results are unordered
-    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=["bar", "baz", "bop"])
+    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=["foo", "bar", "baz"])
