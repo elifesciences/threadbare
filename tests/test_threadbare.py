@@ -1,3 +1,4 @@
+import time
 from functools import partial
 import threadbare
 from threadbare import settings
@@ -29,6 +30,12 @@ def test_nested_state():
             assert env == {'foo': 'bar', 'baz': 'bop'}
     assert env == {}
 
+def test_overridden_state():
+    env = {'foo': 'bar'}
+    with settings(env, foo='baz'):
+        assert env == {'foo': 'baz'}
+    assert env == {'foo': 'bar'}
+
 def test_nested_state_initial_state():
     "state is returned to initial conditions"
     env = {'foo': 'bar'}
@@ -44,6 +51,7 @@ def test_uncontrolled_state_modification():
     env = {'foo': {'bar': 'baz'}}
     with settings(env):
         env['foo']['bar'] = 'bop'
+        assert env == {'foo': {'bar': 'bop'}}
     assert env == {'foo': {'bar': 'bop'}}
 
 def test_settings_closure():
@@ -71,7 +79,7 @@ def test_parallel_wrapper():
     env = {}
     def fn():
         pass
-    wrapped_func = threadbare.parallel(env, fn)
+    wrapped_func = threadbare.parallel(fn)
     assert hasattr(wrapped_func, 'parallel')
     assert wrapped_func.parallel
     assert hasattr(wrapped_func, 'pool_size')
@@ -104,7 +112,7 @@ def test_execute_many_parallel_no_params():
     def fn():
         return "foo"
     pool_size = 3
-    parallel_fn = threadbare.parallel(env, fn, pool_size=pool_size)
+    parallel_fn = threadbare.parallel(fn, pool_size=pool_size)
     expected = ["foo"] * pool_size
     assert expected == threadbare.execute(env, parallel_fn)
 
@@ -113,6 +121,36 @@ def test_execute_many_parallel_with_params():
         with settings() as env:
             return env['mykey']
     env = {'parent': 'environment'}
-    parallel_fn = threadbare.parallel(env, fn)
+    parallel_fn = threadbare.parallel(fn)
     expected = ["foo", "bar", "baz"] # todo: failing, results are unordered
     assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=["foo", "bar", "baz"])
+
+def test_parallel_terminate():
+    "when a process is terminated, ensure internal state is what we expect it to be"
+    def fn():
+        time.sleep(10) # 'hang'
+        return
+
+    env = {} # doesn't matter
+    parallel_fn = threadbare.parallel(fn)
+    param_key = param_values = None
+    return_process_pool=True
+    results_q, pool = threadbare._parallel_execution(env, parallel_fn, param_key, param_values, return_process_pool)
+    
+    process = pool[0]
+    process.terminate()
+    process.join()
+
+    expected = {
+        'alive': False,
+        'exitcode': -15, # negative SIGTERM
+        'kill-signal': 15, # SIGTERM
+        'killed': True,
+        'name': 'process--1',
+        #'pid': ... # not compared
+    }
+    actual_result = threadbare.process_status(process)
+    del actual_result['pid']
+
+    assert expected == actual_result
+    assert results_q.empty()

@@ -33,20 +33,19 @@ def settings(state=None, **kwargs):
             else:
                 del state[key]
 
-def parallel(env, func, pool_size=None):
+def parallel(func, pool_size=None):
     """Forces the wrapped function to run in parallel, instead of sequentially.
     This is an opportunity for pre/post process work prior to calling a function in parallel."""
     # https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
 
     def inner(*args, **kwargs):
-        # wrap this in a `settings` with given env? otherwise, why are we passing env?
         return func(*args, **kwargs)
 
     inner.parallel = True # `func` *must* be forced to run in parallel to main process
 
     # when None, executor decides how many instances of `func` to execute (1, probably)
     # if set and executor is given a set of values to use instead, `pool_size` is ignored
-    inner.pool_size = pool_size if pool_size else None 
+    inner.pool_size = pool_size
     
     return inner
 
@@ -64,9 +63,25 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         result = worker_func()
         queue.put({'name': name, 'result': result})
     except BaseException as unhandled_exception:
+        # "Note that exit handlers and finally clauses, etc., will not be executed."
+        # - https://docs.python.org/2/library/multiprocessing.html#multiprocessing.Process.terminate
         queue.put({'name': name, 'result': unhandled_exception})
 
-def _parallel_execution(env, func, param_key, param_values):
+def process_status(running_p):
+    # https://docs.python.org/2/library/multiprocessing.html#process-and-exceptions
+    result = {'pid': running_p.pid,
+              'name': running_p.name,
+              'exitcode': running_p.exitcode,
+              'alive': running_p.is_alive(),
+              'killed': False,
+              'kill-signal': None
+    }
+    if running_p.exitcode != None and running_p.exitcode < 0:
+        result['killed'] = True
+        result['kill-signal'] = -running_p.exitcode
+    return result
+
+def _parallel_execution(env, func, param_key, param_values, return_process_pool=False):
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is correct
     # before passing it to `_execute` that does the actual magic.
@@ -83,7 +98,9 @@ def _parallel_execution(env, func, param_key, param_values):
         #'name': None, # a name is assigned on process start
         'queue': results_q,
     }
-    pool_values = param_values or range(0, getattr(func, 'pool_size', 1))
+    pool_size = getattr(func, 'pool_size', None)
+    pool_size = pool_size if pool_size != None else 1
+    pool_values = param_values or range(0, pool_size)
         
     pool = []
     for idx, n in enumerate(pool_values):
@@ -95,20 +112,10 @@ def _parallel_execution(env, func, param_key, param_values):
         p = Process(name=kwargs['name'], target=_parallel_execution_worker_wrapper, kwargs=kwargs)
         p.start()
         pool.append(p)
-        
-    def status(running_p):
-        # https://docs.python.org/2/library/multiprocessing.html#process-and-exceptions
-        result = {'pid': running_p.pid,
-                  'name': running_p.name,
-                  'exitcode': running_p.exitcode,
-                  'alive': running_p.is_alive(),
-                  'killed': False,
-                  'kill-signal': None
-        }
-        if running_p.exitcode != None and running_p.exitcode < 0:
-            result['killed'] = True
-            result['kill-signal'] = running_p.exitcode
-        return result
+
+    if return_process_pool:
+        # don't poll for results, don't wait to finish, just return the list of running processes
+        return results_q, pool
 
     result_map = {} # {process-name: process-results, ...}
 
@@ -118,7 +125,7 @@ def _parallel_execution(env, func, param_key, param_values):
     # remove process from pool when it is complete
     while len(pool) > 0:
         for idx, running_p in enumerate(pool):
-            result = status(running_p)
+            result = process_status(running_p)
             if not result['alive']:
                 result_map[result['name']] = result
                 del pool[idx]
@@ -132,6 +139,8 @@ def _parallel_execution(env, func, param_key, param_values):
         # print('got job', job_result)
         job_name = job_result['name']
         result_map[job_name]['result'] = job_result['result']
+
+    results_q.close()
 
     # sort the results, drop the process name
     return [b for a, b in sorted(result_map.items(), key=first)]
