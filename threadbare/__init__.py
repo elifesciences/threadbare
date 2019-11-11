@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+#from collections.abc import Iterable
 import contextlib
 from multiprocessing import Process, Queue
 import os, time
@@ -180,14 +180,14 @@ def execute(env, func, param_key=None, param_values=None):
     # the custom 'JobQueue' adds complexity but can be avoided (I hope):
     # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
     
-    if (param_key and not param_values) or \
-       (not param_key and param_values):
-        raise ValueException("either a `param_key` AND `param_values` are provided OR neither are provided")
+    if (param_key and param_values == None) or \
+       (param_key == None and param_values):
+        raise ValueError("either a `param_key` AND `param_values` are provided OR neither are provided")
 
-    if param_values and not isinstance(param_values, Iterable):
+    if param_values != None and type(param_values) not in [list, tuple, set]:
         raise ValueError("given value for `param_values` must be an iterable type, not %r" % type(param_values))
 
-    if param_key and not isinstance(param_key, str):
+    if param_key != None and not isinstance(param_key, str):
         raise ValueError("given value for `param_key` must be a valid function parameter key")
     
     if hasattr(func, 'parallel') and func.parallel:

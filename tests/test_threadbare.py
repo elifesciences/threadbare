@@ -1,3 +1,4 @@
+import pytest
 import time
 from functools import partial
 import threadbare
@@ -106,6 +107,39 @@ def test_execute_many_serial_with_params():
     expected = ["foobar", "foobaz", "foobop"]
     local_env = None # use global env :(
     assert expected == threadbare.execute(local_env, fn, param_key="mykey", param_values=["bar", "baz", "bop"])
+
+def test_execute_with_missing():
+    def fn():
+        return
+    local_env = {}
+
+    with pytest.raises(ValueError):
+        threadbare.execute(local_env, fn, param_key='good_key', param_values=None)
+
+    with pytest.raises(ValueError):
+        threadbare.execute(local_env, fn, param_values=['good', 'values'])
+
+def test_execute_with_bad_param_key():
+    "`param_key` values must be strings"
+    def fn():
+        return
+    local_env = {}
+    cases = [None, [], {}, (), 1, lambda x: x]
+    for bad_param_key in cases:
+        print('testing',bad_param_key)
+        with pytest.raises(ValueError):
+            threadbare.execute(local_env, fn, param_key=bad_param_key, param_values=["foo"])
+
+def test_execute_with_bad_param_values():
+    "`param_values` must be a list, tuple or set of values"
+    def fn():
+        return
+    local_env = {}
+    cases = [None, 1, "", {}, lambda x: x]
+    for bad_param_values in cases:
+        print('testing',type(bad_param_values))
+        with pytest.raises(ValueError):
+            threadbare.execute(local_env, fn, param_key='mykey', param_values=bad_param_values)
 
 def test_execute_many_parallel_no_params():
     env = {}
