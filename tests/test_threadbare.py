@@ -153,11 +153,13 @@ def test_execute_many_parallel_no_params():
 def test_execute_many_parallel_with_params():
     def fn():
         with settings() as env:
-            return env['mykey']
+            return env
     env = {'parent': 'environment'}
     parallel_fn = threadbare.parallel(fn)
-    expected = ["foo", "bar", "baz"] # todo: failing, results are unordered
-    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=["foo", "bar", "baz"])
+    expected = [{'parent': 'environment', "mykey": 1},
+                {'parent': 'environment', "mykey": 2},
+                {'parent': 'environment', "mykey": 3}]
+    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=[1, 2, 3])
 
 def test_parallel_terminate():
     "when a process is terminated, ensure internal state is what we expect it to be"
