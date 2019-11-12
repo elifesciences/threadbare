@@ -218,9 +218,8 @@ def test_execute_many_parallel():
 def test_execute_many_parallel_with_params():
     "`parallel` will wrap a given function and run it `pool_size` times in parallel, but is ignored when `execute` is given a list of values"
     def fn():
-        with settings() as env:
-            return env
-    env = {'parent': 'environment'}
+        with settings() as local_env:
+            return local_env
     parallel_fn = threadbare.parallel(fn, pool_size=1)
     param_key = 'mykey'
     param_values = [1,2,3]
@@ -228,7 +227,9 @@ def test_execute_many_parallel_with_params():
     expected = [{'parent': 'environment', "mykey": 1},
                 {'parent': 'environment', "mykey": 2},
                 {'parent': 'environment', "mykey": 3}]
-    assert expected == threadbare.execute(env, parallel_fn, param_key, param_values)
+
+    with settings(parent='environment') as env:
+        assert expected == threadbare.execute(env, parallel_fn, param_key, param_values)
 
 def test_execute_many_parallel_raw_results():
     "calling `_parallel_execution` directly provides access to the state of the processes"
