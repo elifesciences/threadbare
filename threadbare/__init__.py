@@ -16,8 +16,7 @@ ENV = {}
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
-    global_state = state == None
-    if global_state:
+    if state == None:
         state = ENV
     if not isinstance(state, dict):
         raise TypeError("state map must be a dictionary-like object, not %r" % type(state))
@@ -26,17 +25,8 @@ def settings(state=None, **kwargs):
     try:
         yield state
     finally:
-        if global_state:
-            #ENV = original_values # doesn't work
-            ENV.clear()
-            ENV.update(original_values)
-            return
-        kwargs.update(original_values)
-        for key, val in kwargs.items():
-            if key not in original_values:
-                del state[key]
-                continue
-            state[key] = original_values[key]
+        state.clear()
+        state.update(original_values)
 
 def serial(func, pool_size=None):
     """Forces the given function to run `pool_size` times.
