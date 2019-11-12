@@ -1,4 +1,5 @@
 #from collections.abc import Iterable
+import copy
 import contextlib
 from multiprocessing import Process, Queue
 import os, time
@@ -15,39 +16,44 @@ ENV = {}
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
-    if state == None:
+    global_state = state == None
+    if global_state:
         state = ENV
     if not isinstance(state, dict):
         raise TypeError("state map must be a dictionary-like object, not %r" % type(state))
-    original_values = {}
-    for key, val in kwargs.items():
-        if key in state:
-            original_values[key] = state[key]
-        state[key] = val
+    original_values = copy.deepcopy(state)
+    state.update(kwargs)
     try:
         yield state
     finally:
+        if global_state:
+            #ENV = original_values # doesn't work
+            ENV.clear()
+            ENV.update(original_values)
+            return
+        kwargs.update(original_values)
         for key, val in kwargs.items():
-            if key in original_values:
-                state[key] = original_values[key]
-            else:
+            if key not in original_values:
                 del state[key]
+                continue
+            state[key] = original_values[key]
+
+def serial(func, pool_size=None):
+    """Forces the given function to run `pool_size` times.
+    when pool_size is None (default), executor decides how many instances of `func` to execute (1, probably).
+    if set and executor is given a set of values to use instead, `pool_size` is ignored"""
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+    inner.pool_size = pool_size
+    return inner
 
 def parallel(func, pool_size=None):
     """Forces the wrapped function to run in parallel, instead of sequentially.
     This is an opportunity for pre/post process work prior to calling a function in parallel."""
     # https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
-
-    def inner(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    inner.parallel = True # `func` *must* be forced to run in parallel to main process
-
-    # when None, executor decides how many instances of `func` to execute (1, probably)
-    # if set and executor is given a set of values to use instead, `pool_size` is ignored
-    inner.pool_size = pool_size
-    
-    return inner
+    wrapped_func = serial(func, pool_size)
+    wrapped_func.parallel = True # `func` *must* be forced to run in parallel to main process
+    return wrapped_func
 
 def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
     try:
@@ -105,7 +111,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     pool = []
     for idx, n in enumerate(pool_values):
         kwargs['name'] = 'process--' + str(idx + 1) # process--1, process--2
-        new_env = env.copy()
+        new_env = {} if not env else copy.deepcopy(env)
         if n:
             new_env[param_key] = n
         kwargs['env'] = new_env
@@ -153,8 +159,10 @@ def _serial_execution(env, func, param_key, param_values):
                 result_list.append(func())
     else:
         # pretty boring :(
-        with settings(env):
-            result_list.append(func())
+        # I could set '_idx' or something in `env` I suppose ..
+        for _ in range(0, getattr(func, 'pool_size', 1)):
+            with settings(env):
+                result_list.append(func())
     return result_list
 
 def execute(env, func, param_key=None, param_values=None):

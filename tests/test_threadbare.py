@@ -4,13 +4,8 @@ from functools import partial
 import threadbare
 from threadbare import settings
 
-def test_global_env():
-    "`settings` context manager uses internal (empty) state dictionary if a specific dictionary isn't supplied"
-    assert len(threadbare.ENV) == 0, "env is not initially empty"
-    with settings(foo='bar'):
-        assert len(threadbare.ENV) == 1, "env should contain one item"
-        assert threadbare.ENV['foo'] == 'bar'
-    assert len(threadbare.ENV) == 0, "env is not finally empty"
+# 'local' state
+# this *is not* what Fabric does
 
 def test_env():
     "`settings` context manager will use the provided state dictionary if one is provided"
@@ -25,6 +20,7 @@ def test_env():
     assert len(threadbare.ENV) == 0, "global env should continue to be empty"
 
 def test_nested_state():
+    "settings decorator can be nested"
     env = {}
     with settings(env, foo='bar'):
         with settings(env, baz='bop'):
@@ -32,18 +28,27 @@ def test_nested_state():
     assert env == {}
 
 def test_overridden_state():
+    "overrides exist only for the scope of the context manager"
     env = {'foo': 'bar'}
     with settings(env, foo='baz'):
         assert env == {'foo': 'baz'}
     assert env == {'foo': 'bar'}
 
 def test_deleted_state():
+    "state is restored when a value is deleted"
     env = {'foo': 'bar'}
-    with settings(env) as newenv:
+    with settings(env):
         del env['foo']
         assert env == {}
-    # `settings` is nothing more than a fancy wrapper around the original reference and is NOT a copy
-    assert env == {} # still empty
+    assert env == {'foo': 'bar'}
+
+def test_deleted_state_2():
+    "state is restored when a value is removed"
+    env = {'foo': 'bar'}
+    with settings(env) as newenv:
+        env.pop('foo')
+        assert env == {}
+    assert env == {'foo': 'bar'}
 
 def test_nested_state_initial_state():
     "state is returned to initial conditions"
@@ -56,12 +61,12 @@ def test_nested_state_initial_state():
     assert env == {'foo': 'bar'}
 
 def test_uncontrolled_state_modification():
-    "modifications to the state that happen outside of the context manager's control are preserved"
+    "modifications to the state that happen outside of the context manager's control (with ... as ...) are reverted on exit"
     env = {'foo': {'bar': 'baz'}}
     with settings(env):
         env['foo']['bar'] = 'bop'
         assert env == {'foo': {'bar': 'bop'}}
-    assert env == {'foo': {'bar': 'bop'}}
+    assert env == {'foo': {'bar': 'baz'}}
 
 def test_settings_closure():
     "access to an enclosed state dictionary without reference to the original is still possible"
@@ -80,96 +85,153 @@ def test_settings_nested_closure():
     with enclosed(foo='bar'):
         with enclosed(baz='bop') as env2:
             assert env == env2 == {'foo':'bar','baz':'bop'}
-    assert env == {}
+    assert env == env2 == {}
+
+# global state
+# not pretty, often hard to reason about and may lead to weird behaviour if you're not careful.
+# this is what Fabric does.
+
+def test_global_env():
+    "`settings` context manager uses global (and empty) state dictionary if a specific dictionary isn't supplied"
+    assert threadbare.ENV == {}
+    with settings(foo='bar'):
+        assert threadbare.ENV == {'foo': 'bar'}
+    assert threadbare.ENV == {}
+
+def test_global_nested_state():
+    "context managers can be nested for global state"
+    assert threadbare.ENV == {}
+    with settings(foo='bar'):
+        with settings(baz='bop'):
+            assert threadbare.ENV == {'foo': 'bar', 'baz': 'bop'}
+    assert threadbare.ENV == {}
+
+def test_global_overridden_state():
+    "global overrides exist only for the scope of the context manager"
+    assert threadbare.ENV == {}
+    with settings(foo='baz') as local_env:
+        assert local_env == {'foo': 'baz'}
+    # python vagary that this can still be referenced
+    # it should still be as we expect though.
+    assert local_env == {} 
+    assert threadbare.ENV == {}
+
+def test_global_deleted_state():
+    "original global state is restored if a value is deleted"
+    assert threadbare.ENV == {}
+    with settings(foo='bar', bar='baz') as env:
+        assert threadbare.ENV == env == {'foo': 'bar', 'bar': 'baz'}
+        del env['foo']
+        assert threadbare.ENV == env == {'bar': 'baz'}
+    assert threadbare.ENV == env == {}
+
+def test_uncontrolled_global_state_modification():
+    """modifications to global state that happen outside of the context manager's 
+    control (with ... as ...) are available as expected BUT are reverted on exit"""
+    assert threadbare.ENV == {}
+    with settings() as env:
+        threadbare.ENV['foo'] = {'bar': 'bop'}
+        assert env == {'foo': {'bar': 'bop'}}
+    assert threadbare.ENV == env == {}    
 
 # 
 
 def test_parallel_wrapper():
-    env = {}
+    "`parallel` correctly sets attributes on the function to be run in parallel with `execute`"
     def fn():
         pass
+    assert not hasattr(fn, 'parallel')
+    assert not hasattr(fn, 'pool_size')
     wrapped_func = threadbare.parallel(fn)
     assert hasattr(wrapped_func, 'parallel')
     assert wrapped_func.parallel
     assert hasattr(wrapped_func, 'pool_size')
 
-def test_execute():
-    env = {}
+def test_execute_serial():
+    "`execute` will call a regular function and return a list of results"
+    env = None
     def fn():
         return "hello, world"
     expected = ["hello, world"]
     assert expected == threadbare.execute(env, fn)
 
 def test_execute_many_serial():
-    env = {}
-    def fn():
-        return "foo"
-    expected = ["foo"]
-    assert expected == threadbare.execute(env, fn)
+    "`serial` will wrap a given function and run it `pool_size` times, one after the other. complements `parallel`"
+    env = None
+    pool_size=3
+    wrapped_fn = threadbare.serial(lambda: "foo", pool_size)
+    expected = ["foo", "foo", "foo"]
+    assert expected == threadbare.execute(env, wrapped_fn)
 
 def test_execute_many_serial_with_params():
-    # note: test emulates Fabric's global `_env` dictionary
+    "`serial` will wrap a given function and run it `pool_size` times, but is ignored when `execute` is given a list of values"
+    env = None
     def fn():
-        with settings() as env:
-            return "foo" + env['mykey']
+        with settings() as local_env:
+            return "foo" + local_env['mykey']
+    wrapped_fn = threadbare.serial(fn, pool_size=1)
+    param_key = "mykey"
+    param_values =["bar", "baz", "bop"]
+    
     expected = ["foobar", "foobaz", "foobop"]
-    local_env = None # use global env :(
-    assert expected == threadbare.execute(local_env, fn, param_key="mykey", param_values=["bar", "baz", "bop"])
+    assert expected == threadbare.execute(env, wrapped_fn, param_key, param_values)
 
 def test_execute_with_missing():
+    "both `param_key` and `param_values` should be provided or neither"
     def fn():
         return
-    local_env = {}
+    env = None
+    with pytest.raises(ValueError):
+        threadbare.execute(env, fn, param_key='good_key', param_values=None)
 
     with pytest.raises(ValueError):
-        threadbare.execute(local_env, fn, param_key='good_key', param_values=None)
-
-    with pytest.raises(ValueError):
-        threadbare.execute(local_env, fn, param_values=['good', 'values'])
+        threadbare.execute(env, fn, param_values=['good', 'values'])
 
 def test_execute_with_bad_param_key():
     "`param_key` values must be strings"
     def fn():
         return
-    local_env = {}
+    env = None
     cases = [None, [], {}, (), 1, lambda x: x]
     for bad_param_key in cases:
-        print('testing',bad_param_key)
         with pytest.raises(ValueError):
-            threadbare.execute(local_env, fn, param_key=bad_param_key, param_values=["foo"])
+            threadbare.execute(env, fn, param_key=bad_param_key, param_values=["foo"])
 
 def test_execute_with_bad_param_values():
     "`param_values` must be a list, tuple or set of values"
     def fn():
         return
-    local_env = {}
+    env = None
     cases = [None, 1, "", {}, lambda x: x]
     for bad_param_values in cases:
-        print('testing',type(bad_param_values))
         with pytest.raises(ValueError):
-            threadbare.execute(local_env, fn, param_key='mykey', param_values=bad_param_values)
+            threadbare.execute(env, fn, param_key='mykey', param_values=bad_param_values)
 
-def test_execute_many_parallel_no_params():
-    env = {}
-    def fn():
-        return "foo"
+def test_execute_many_parallel():
+    "`parallel` will wrap a given function and run it `pool_size` times in parallel. complements `serial`"
+    env = None
     pool_size = 3
-    parallel_fn = threadbare.parallel(fn, pool_size=pool_size)
-    expected = ["foo"] * pool_size
+    parallel_fn = threadbare.parallel(lambda: "foo", pool_size)
+    expected = ["foo", "foo", "foo"]
     assert expected == threadbare.execute(env, parallel_fn)
 
 def test_execute_many_parallel_with_params():
+    "`parallel` will wrap a given function and run it `pool_size` times in parallel, but is ignored when `execute` is given a list of values"
     def fn():
         with settings() as env:
             return env
     env = {'parent': 'environment'}
-    parallel_fn = threadbare.parallel(fn)
+    parallel_fn = threadbare.parallel(fn, pool_size=1)
+    param_key = 'mykey'
+    param_values = [1,2,3]
+    
     expected = [{'parent': 'environment', "mykey": 1},
                 {'parent': 'environment', "mykey": 2},
                 {'parent': 'environment', "mykey": 3}]
-    assert expected == threadbare.execute(env, parallel_fn, param_key='mykey', param_values=[1, 2, 3])
+    assert expected == threadbare.execute(env, parallel_fn, param_key, param_values)
 
 def test_execute_many_parallel_raw_results():
+    "calling `_parallel_execution` directly provides access to the state of the processes"
     def fn():
         with settings() as env:
             return env
