@@ -1,4 +1,3 @@
-#from collections.abc import Iterable
 import copy
 import contextlib
 from multiprocessing import Process, Queue
@@ -78,20 +77,12 @@ def process_status(running_p):
     return result
 
 def _parallel_execution(env, func, param_key, param_values, return_process_pool=False):
-
-    # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is correct
-    # before passing it to `_execute` that does the actual magic.
-    # `execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L372-L401
-    # `_execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L213-L277
-
-    # the custom 'JobQueue' adds complexity but can be avoided (I hope):
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
-
+    "executes the given function in parallel to main process. blocks until processes are complete"
     results_q = Queue()
     kwargs = {
-        'env': env,
+        #'env': ..., # each process will get a new state dictionary
         'worker_func': func,
-        #'name': None, # a name is assigned on process start
+        #'name': ..., # a name is assigned on process start
         'queue': results_q,
     }
     pool_size = getattr(func, 'pool_size', None)
@@ -132,7 +123,6 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
 
     while not results_q.empty():
         job_result = results_q.get()
-        # print('got job', job_result)
         job_name = job_result['name']
         result_map[job_name]['result'] = job_result['result']
 
@@ -142,6 +132,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     return [b for a, b in sorted(result_map.items(), key=first)]
 
 def _serial_execution(env, func, param_key, param_values):
+    "executes the given function serially"
     result_list = []
     if param_key and param_values:
         for x in param_values:
@@ -167,7 +158,7 @@ def execute(env, func, param_key=None, param_values=None):
 
     `param` and `param_list` are optional, but if one is specified then so must the other.
 
-    parent process blocks until all child processes have completed or timeout is reached.
+    parent process blocks until all child processes have completed.
     returns a map of execution data with the return values of the individual executions available under 'result'"""
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is correct
