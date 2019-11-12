@@ -1,0 +1,4 @@
+- [ ] `local`
+- [ ] `remote`
+- [ ] capture stdout + stderr
+- [ ] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
