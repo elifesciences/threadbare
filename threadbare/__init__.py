@@ -9,9 +9,26 @@ def first(x):
     except (KeyError, ValueError, TypeError):
         return None
 
+# TODO: tests
+def merge(*dict_list):
+    from functools import reduce
+    def reduce_fn(a, b=None):
+        c = {}
+        c.update(a)
+        c.update(b or {})
+        return c
+    return reduce(reduce_fn, dict_list)
+
 #
 
 ENV = {}
+
+# TODO: tests. this is just like subdict
+def get_settings(state=None, key_list=None):
+    key_list = key_list or []
+    if state == None:
+        state = ENV
+    return {key: state[key] for key in key_list if key in state}
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
