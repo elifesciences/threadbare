@@ -1,6 +1,6 @@
 import os
 import socket
-from ssh2.session import Session
+import ssh2.session
 import threadbare
 from threadbare import merge
 
@@ -58,7 +58,7 @@ def _execute(command, user, private_key_file, host, port, use_pty):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((host, port))
     
-    session = Session()
+    session = ssh2.session.Session()
     session.handshake(sock)
     
     session.userauth_publickey_fromfile(user, private_key_file)
@@ -70,6 +70,11 @@ def _execute(command, user, private_key_file, host, port, use_pty):
     # https://ssh2-python.readthedocs.io/en/latest/channel.html#ssh2.channel.Channel.execute
     channel.execute(command)
 
+    # https://github.com/ParallelSSH/ssh2-python/blob/master/examples/example_echo.py#L39-L41
+    channel.wait_eof()
+    channel.close()
+    channel.wait_closed()
+
     # reading output
     size, data = channel.read()
     buff = b''
@@ -77,6 +82,8 @@ def _execute(command, user, private_key_file, host, port, use_pty):
         # buffers output in ram
         buff += data
         size, data = channel.read()
+
+    session.disconnect()
 
     return {
         'return_code': channel.get_exit_status(),
@@ -99,8 +106,8 @@ def remote(command, use_shell=True, use_sudo=False, **kwargs): #host=None, port=
     #stdout=None # todo
     #stderr=None # todo
     #timeout=None # todo
-    #shell_escape=None
-    #capture_buffer_size=None
+    #shell_escape=None # ignored. shell commands are always escaped
+    #capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
 
     # wrap the command up
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
@@ -150,8 +157,10 @@ def remote_sudo(command, **kwargs):
 def main():
     # it's embarassing how nice it is to play with global state...
     with threadbare.settings(user='elife', host='34.201.187.7'):
-        result = remote_sudo('salt-call pillar.items')
+        #result = remote_sudo('salt-call pillar.items')
         #result = remote_sudo(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
+        result = remote('echo "stdout"; >&2 echo "stderr"')
+        result = remote('errcho() { echo "$@" >&2; }; errcho hello')
         print('---')
         for line in result['lines']():
             print(line)
