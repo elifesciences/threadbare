@@ -20,7 +20,7 @@ def test_remote_args_to_execute():
         'user': USER,
         'private_key_file': PEM,
         
-        'use_pty': True,
+        'use_pty': False,
         'command': '/bin/bash -l -c "echo hello"'
     }
 
@@ -40,7 +40,7 @@ def test_remote_sudo_args_to_execute():
         'user': USER,
         'private_key_file': PEM,
 
-        'use_pty': True,
+        'use_pty': False,
         'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'
     }
     mockobj.assert_called_with(**expected_kwargs)
