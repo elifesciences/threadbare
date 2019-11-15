@@ -20,7 +20,7 @@ def test_remote_args_to_execute():
         'user': USER,
         'private_key_file': PEM,
         
-        'use_pty': False,
+        'use_pty': True,
         'command': '/bin/bash -l -c "echo hello"'
     }
 
@@ -40,7 +40,7 @@ def test_remote_sudo_args_to_execute():
         'user': USER,
         'private_key_file': PEM,
 
-        'use_pty': False,
+        'use_pty': True,
         'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'
     }
     mockobj.assert_called_with(**expected_kwargs)
@@ -57,10 +57,13 @@ def test_remote_non_default_args():
     }
     cases = [
         # non-shell regular command
-        [{'use_shell': False}, {'use_pty': False, 'command': 'echo hello'}],
+        [{'use_shell': False}, {'use_pty': True, 'command': 'echo hello'}],
+
+        # non-shell, non-tty command
+        [{'use_shell': False, 'combine_stderr': False}, {'use_pty': False, 'command': 'echo hello'}],
 
         # non-shell sudo command
-        [{'use_shell': False, 'use_sudo': True}, {'use_pty': False, 'command': 'sudo --non-interactive echo hello'}]
+        [{'use_shell': False, 'use_sudo': True}, {'use_pty': True, 'command': 'sudo --non-interactive echo hello'}]
     ]
     for given_kwargs, expected_kwargs in cases:
         with patch('threadbare.api._execute') as mockobj:

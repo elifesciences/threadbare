@@ -96,7 +96,7 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwarg
 
     # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
     # bug or expected behaviour in parallel-ssh?
-    use_pty = not combine_stderr # combine_stderr is True by default
+    use_pty = combine_stderr
 
     # values stored in global state, if any (global state is *empty* by default)
     global_kwargs = threadbare.get_settings(key_list=['user', 'host', 'port', 'private_key_file'])
@@ -142,7 +142,7 @@ def main():
     with threadbare.settings(user='elife', host='34.201.187.7'):
         #result = remote_sudo('salt-call pillar.items')
         #result = remote_sudo(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
-        result = remote('echo "standard out"; >&2 echo "standard error"')
+        result = remote('echo "standard out"; >&2 echo "standard error"', combine_stderr=False)
         print('---')
 
         for line in result['stdout']:
@@ -152,7 +152,7 @@ def main():
             print('stderr:',line)
 
         print('---')
-        print('results:',result)
+        #print('results:',result)
     
 if __name__ == '__main__':
     main()
