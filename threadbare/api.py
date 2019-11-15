@@ -1,6 +1,6 @@
+from pssh.clients.native import SSHClient
 import os
 import socket
-import ssh2.session
 import threadbare
 from threadbare import merge
 
@@ -53,58 +53,38 @@ def sudo_wrap_command(command):
 
 # api
 
-# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L726-L856
-def _execute(command, user, private_key_file, host, port, use_pty):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((host, port))
+def _execute(command, user, private_key_file, host, port, combine_stderr):
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+    password = None
+    client = SSHClient(host, user, password, port, pkey=private_key_file)
     
-    session = ssh2.session.Session()
-    session.handshake(sock)
+    # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
+    sudo = False # handled ourselves
+    shell = False # handled ourselves
+    timeout = None # todo
+    encoding = 'utf-8' # default everywhere
+    #use_pty=False # if True, stdout and stderr are combined. bug or expected behaviour in parallel-ssh?
+    use_pty = not combine_stderr # combine_stderr is True by default
+    channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
     
-    session.userauth_publickey_fromfile(user, private_key_file)
-    channel = session.open_session()
-
-    # https://ssh2-python.readthedocs.io/en/latest/channel.html#ssh2.channel.Channel.pty
-    use_pty and channel.pty()
-
-    # https://ssh2-python.readthedocs.io/en/latest/channel.html#ssh2.channel.Channel.execute
-    channel.execute(command)
-
-    # https://github.com/ParallelSSH/ssh2-python/blob/master/examples/example_echo.py#L39-L41
-    channel.wait_eof()
-    channel.close()
-    channel.wait_closed()
-
-    # reading output
-    size, data = channel.read()
-    buff = b''
-    while(size > 0):
-        # buffers output in ram
-        buff += data
-        size, data = channel.read()
-
-    session.disconnect()
-
     return {
         'return_code': channel.get_exit_status(),
         'command': command,
-        'bytes': buff,
-
-        # todo: the buffered output and this need to be re-thought.
-        # probably when I take a look at how stdout/stderr/stdin pipes are handled
-        'lines': lambda: buff.decode('utf-8').splitlines(),
+        'stdout': stdout,
+        'stderr': stderr,
     }
 
+# https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L898-L901
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L975
-def remote(command, use_shell=True, use_sudo=False, **kwargs): #host=None, port=None, private_key_file=None, use_sudo=False, use_shell=True, **kwargs):
+def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwargs): #host=None, port=None, private_key_file=None, use_sudo=False, use_shell=True, **kwargs):
     #shell=True # done
-    #pty=True   # done
-    #combine_stderr=None
+    #pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
+    #combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
     #quiet=False,
     #warn_only=False
-    #stdout=None # todo
-    #stderr=None # todo
+    #stdout=None # done
+    #stderr=None # done
     #timeout=None # todo
     #shell_escape=None # ignored. shell commands are always escaped
     #capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
@@ -141,7 +121,9 @@ def remote(command, use_shell=True, use_sudo=False, **kwargs): #host=None, port=
     # final dictionary of keyword parameters that `_execute` receives
     final_kwargs = merge(global_kwargs, base_kwargs, user_kwargs, cmd_kwargs)
 
-    return _execute(**final_kwargs)
+    result = _execute(**final_kwargs)
+
+    return 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
 def remote_sudo(command, **kwargs):
@@ -159,13 +141,16 @@ def main():
     with threadbare.settings(user='elife', host='34.201.187.7'):
         #result = remote_sudo('salt-call pillar.items')
         #result = remote_sudo(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
-        result = remote('echo "stdout"; >&2 echo "stderr"')
-        result = remote('errcho() { echo "$@" >&2; }; errcho hello')
+        result = remote('echo "standard out"; >&2 echo "standard error"')
         print('---')
-        for line in result['lines']():
-            print(line)
+
+        for line in result['stderr']:
+            print('stderr:',line)
+
+        for line in result['stdout']:
+            print('stdout:',line)
+
         print('---')
-        del result['bytes'] # noisy
         print(result)
     
 if __name__ == '__main__':

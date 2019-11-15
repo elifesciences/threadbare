@@ -1,2 +1,2 @@
 pytest
-ssh2-python
+parallel-ssh
