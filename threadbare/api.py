@@ -53,7 +53,7 @@ def sudo_wrap_command(command):
 
 # api
 
-def _execute(command, user, private_key_file, host, port, combine_stderr):
+def _execute(command, user, private_key_file, host, port, use_pty):
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
     password = None
     client = SSHClient(host, user, password, port, pkey=private_key_file)
@@ -63,8 +63,6 @@ def _execute(command, user, private_key_file, host, port, combine_stderr):
     shell = False # handled ourselves
     timeout = None # todo
     encoding = 'utf-8' # default everywhere
-    #use_pty=False # if True, stdout and stderr are combined. bug or expected behaviour in parallel-ssh?
-    use_pty = not combine_stderr # combine_stderr is True by default
     channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
     
     return {
@@ -96,6 +94,10 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwarg
     if use_sudo:
         command = sudo_wrap_command(command)
 
+    # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
+    # bug or expected behaviour in parallel-ssh?
+    use_pty = not combine_stderr # combine_stderr is True by default
+
     # values stored in global state, if any (global state is *empty* by default)
     global_kwargs = threadbare.get_settings(key_list=['user', 'host', 'port', 'private_key_file'])
 
@@ -112,18 +114,17 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwarg
     # values `remote` specifically passes to `_execute`, overriding all others
     cmd_kwargs = {
         'command': command,
-
-        # the two are not synonymous, but we'll pretend they are
-        # we get ansi control characters (colours!) when salt detects a pseudo terminal
-        'use_pty': use_shell,
+        'use_pty': use_pty
     }
 
     # final dictionary of keyword parameters that `_execute` receives
     final_kwargs = merge(global_kwargs, base_kwargs, user_kwargs, cmd_kwargs)
 
+    # print('args to execute:',final_kwargs)
+    
     result = _execute(**final_kwargs)
 
-    return 
+    return result
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
 def remote_sudo(command, **kwargs):
@@ -144,14 +145,14 @@ def main():
         result = remote('echo "standard out"; >&2 echo "standard error"')
         print('---')
 
-        for line in result['stderr']:
-            print('stderr:',line)
-
         for line in result['stdout']:
             print('stdout:',line)
 
+        for line in result['stderr']:
+            print('stderr:',line)
+
         print('---')
-        print(result)
+        print('results:',result)
     
 if __name__ == '__main__':
     main()
