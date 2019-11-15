@@ -2,8 +2,7 @@ from pssh.clients.native import SSHClient
 import os, sys
 import socket
 import threadbare
-from threadbare import merge
-from threadbare.common import update, identity
+from threadbare.common import merge, update, identity, subdict
 from functools import partial
 
 # utils
@@ -91,11 +90,8 @@ def streaming_print(output_pipe, quiet, discard_output, line):
         return line
 
 def _process_output(output_pipe, result_list, quiet, discard_output):
-    cmd_kwargs = {
-        'quiet': quiet,
-        'discard_output': discard_output
-    }
-    global_kwargs = threadbare.get_settings(key_list=['quiet', 'discard_output'])
+    cmd_kwargs = subdict(locals(), ['quiet', 'discard_output'])
+    global_kwargs = subdict(threadbare.ENV, ['quiet', 'discard_output'])
     kwargs = merge(cmd_kwargs, global_kwargs)
 
     # always process the results as soon as we have them
@@ -134,7 +130,7 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=F
     use_pty = combine_stderr
 
     # values stored in global state, if any (global state is *empty* by default)
-    global_kwargs = threadbare.get_settings(key_list=['user', 'host', 'port', 'private_key_file'])
+    global_kwargs = subdict(threadbare.ENV, ['user', 'host', 'port', 'private_key_file'])
 
     # values that would otherwise be function parameter defaults or calculated somewhere
     # should these live here?
@@ -144,7 +140,7 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=F
     }
 
     # values the user has passed in - *explicit* overrides
-    user_kwargs = threadbare.get_settings(kwargs, key_list=['user', 'host', 'port', 'private_key_file'])
+    user_kwargs = subdict(kwargs, ['user', 'host', 'port', 'private_key_file'])
 
     # values `remote` specifically passes to `_execute`, overriding all others
     cmd_kwargs = {

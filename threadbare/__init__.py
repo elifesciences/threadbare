@@ -6,13 +6,6 @@ from threadbare.common import subdict, merge, first
 
 ENV = {}
 
-# TODO: tests. this is just like subdict
-def get_settings(state=None, key_list=None):
-    key_list = key_list or []
-    if state == None:
-        state = ENV
-    return subdict(state, key_list)
-
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
     if state == None:
