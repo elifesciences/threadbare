@@ -23,10 +23,6 @@ def test_remote_args_to_execute():
         'use_pty': True,
         'command': '/bin/bash -l -c "echo hello"'
     }
-
-    # _execute(command='/bin/bash -l -c "echo hello"', host='testhost', private_key_file='/home/luke/.ssh/id_rsa', use_pty=True, user='testuser')
-    
-    
     mockobj.assert_called_with(**expected_kwargs)
 
 def test_remote_sudo_args_to_execute():

@@ -1,8 +1,10 @@
 from pssh.clients.native import SSHClient
-import os
+import os, sys
 import socket
 import threadbare
 from threadbare import merge
+from threadbare.common import update, identity
+from functools import partial
 
 # utils
 
@@ -64,25 +66,58 @@ def _execute(command, user, private_key_file, host, port, use_pty):
     timeout = None # todo
     encoding = 'utf-8' # default everywhere
     channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
-    
+
+    def get_exitcode():
+        client.wait_finished(channel) # timeout here
+        return channel.get_exit_status()
+
     return {
-        'return_code': channel.get_exit_status(),
+        'return_code': get_exitcode,
         'command': command,
         'stdout': stdout,
         'stderr': stderr,
     }
 
+def streaming_print(output_pipe, quiet, discard_output, line):
+    """writes the given `line` (string) to the given `output_pipe` (file-like object) if `quiet` is True. 
+    returns the given line if `discard_output` is False
+
+    this allows some control over 
+    then fiddle about with the data after the fact.
+    if you're expecting very very large responses, `discard_output` should be set to `True`."""
+    if not quiet:
+        output_pipe.write(line + "\n")
+    if not discard_output:
+        return line
+
+def _process_output(output_pipe, result_list, quiet, discard_output):
+    cmd_kwargs = {
+        'quiet': quiet,
+        'discard_output': discard_output
+    }
+    global_kwargs = threadbare.get_settings(key_list=['quiet', 'discard_output'])
+    kwargs = merge(cmd_kwargs, global_kwargs)
+
+    # always process the results as soon as we have them
+    # use `quiet` to hide the printing of output to stdout/stderr
+    # use `discard_output` to discard the results as soon as they are read
+    # stderr may be empty if `combine_stderr` in `remote` was `True`
+    new_results = [streaming_print(output_pipe, line=line, **kwargs) for line in result_list]
+    output_pipe.flush()
+    if not kwargs['discard_output']:
+        return new_results
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L898-L901
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L975
-def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwargs): #host=None, port=None, private_key_file=None, use_sudo=False, use_shell=True, **kwargs):
+def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=False, discard_output=False, **kwargs):
     #shell=True # done
     #pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
     #combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
     #quiet=False,
     #warn_only=False
-    #stdout=None # done
-    #stderr=None # done
+    #stdout=None # ignore
+    #stderr=None # ignore
     #timeout=None # todo
     #shell_escape=None # ignored. shell commands are always escaped
     #capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
@@ -118,11 +153,19 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, **kwarg
     }
 
     # final dictionary of keyword parameters that `_execute` receives
-    final_kwargs = merge(global_kwargs, base_kwargs, user_kwargs, cmd_kwargs)
+    final_kwargs = merge(base_kwargs, user_kwargs, global_kwargs, cmd_kwargs)
 
     # print('args to execute:',final_kwargs)
     
     result = _execute(**final_kwargs)
+
+    result.update({
+        'stdout': _process_output(sys.stdout, result['stdout'], quiet, discard_output),
+        'stderr': _process_output(sys.stderr, result['stderr'], quiet, discard_output),
+
+        # command must have finished before we have access to return code
+        'return_code': result['return_code'](), 
+    })
 
     return result
 
@@ -139,20 +182,22 @@ def remote_sudo(command, **kwargs):
 
 def main():
     # it's embarassing how nice it is to play with global state...
-    with threadbare.settings(user='elife', host='34.201.187.7'):
-        #result = remote_sudo('salt-call pillar.items')
-        #result = remote_sudo(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
-        result = remote('echo "standard out"; >&2 echo "standard error"', combine_stderr=False)
+    with threadbare.settings(user='elife', host='34.201.187.7', quiet=False, discard_output=False) as env:
+        #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
+        result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
+        #result = remote_sudo('salt-call state.highstate')
+
+        if env.get('quiet', False) and not env.get('discard_output', False):
+            print('---')
+            for line in result['stdout']:
+                print('stdout:',line)
+
+            for line in result['stderr']:
+                print('stderr:',line)
+
         print('---')
-
-        for line in result['stdout']:
-            print('stdout:',line)
-
-        for line in result['stderr']:
-            print('stderr:',line)
-
-        print('---')
-        #print('results:',result)
+        
+        print('results:',result)
     
 if __name__ == '__main__':
     main()

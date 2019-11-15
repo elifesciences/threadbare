@@ -2,24 +2,7 @@ import copy
 import contextlib
 from multiprocessing import Process, Queue
 import os, time
-
-def first(x):
-    try:
-        return x[0]
-    except (KeyError, ValueError, TypeError):
-        return None
-
-# TODO: tests
-def merge(*dict_list):
-    from functools import reduce
-    def reduce_fn(a, b=None):
-        c = {}
-        c.update(a)
-        c.update(b or {})
-        return c
-    return reduce(reduce_fn, dict_list)
-
-#
+from threadbare.common import subdict, merge, first
 
 ENV = {}
 
@@ -28,7 +11,7 @@ def get_settings(state=None, key_list=None):
     key_list = key_list or []
     if state == None:
         state = ENV
-    return {key: state[key] for key in key_list if key in state}
+    return subdict(state, key_list)
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
