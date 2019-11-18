@@ -1,5 +1,5 @@
 from threadbare.state import settings
-from threadbare.api import remote
+from threadbare.operations import remote
 
 def main():
     # it's embarassing how nice it is to play with global state...
