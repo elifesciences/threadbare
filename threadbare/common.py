@@ -2,9 +2,13 @@ from functools import reduce
 
 def first(x):
     "returns the first element in an collection of things"
+    if x == None:
+        return x
     try:
+        if isinstance(x, dict):
+            return list(x.items())[0]
         return x[0]
-    except (KeyError, ValueError):
+    except (ValueError, IndexError):
         return None
 
 def merge(*dict_list):
