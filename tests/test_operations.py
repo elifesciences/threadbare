@@ -1,7 +1,7 @@
 import pytest
 import unittest.mock as mock
 from unittest.mock import patch
-from threadbare import api
+from threadbare import operations
 from threadbare.common import merge
 from pssh import exceptions as pssh_exceptions
 
@@ -13,9 +13,9 @@ PORT = 666
 PEM = "/home/testuser/.ssh/id_rsa"
 
 def test_remote_args_to_execute():
-    "`api.remote` calls `api._execute` with the correct arguments"
-    with patch('threadbare.api._execute') as mockobj:
-        api.remote('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
+    "`operations.remote` calls `operations._execute` with the correct arguments"
+    with patch('threadbare.operations._execute') as mockobj:
+        operations.remote('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
 
     expected_kwargs = {
         'host': HOST,
@@ -29,9 +29,9 @@ def test_remote_args_to_execute():
     mockobj.assert_called_with(**expected_kwargs)
 
 def test_remote_sudo_args_to_execute():
-    "`api.remote_sudo` calls `api._execute` with the correct arguments"
-    with patch('threadbare.api._execute') as mockobj:
-        api.remote_sudo('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
+    "`operations.remote_sudo` calls `operations._execute` with the correct arguments"
+    with patch('threadbare.operations._execute') as mockobj:
+        operations.remote_sudo('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
 
     expected_kwargs = {
         'host': HOST,
@@ -47,7 +47,7 @@ def test_remote_sudo_args_to_execute():
 # remote calls with non-default args
 
 def test_remote_non_default_args():
-    "`api.remote` calls `api._execute` with the correct arguments"
+    "`operations.remote` calls `operations._execute` with the correct arguments"
     base = {
         'host': HOST,
         'port': PORT,
@@ -73,10 +73,10 @@ def test_remote_non_default_args():
         # shell, sudo command
         [{'use_shell': True, 'use_sudo': True},  {'use_pty': True, 'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'}],
 
-        # shell escaping
+        # shell escoperationsng
         [{'command': 'foo=bar; echo "bar? $foo!"'},  {'use_pty': True, 'command': '/bin/bash -l -c "foo=bar; echo \\"bar? \\$foo!\\""'}],
 
-        # shell escaping, non-shell
+        # shell escoperationsng, non-shell
         [{'command': 'foo=bar; echo "bar? $foo!"', 'use_shell': False},  {'use_pty': True, 'command': 'foo=bar; echo "bar? $foo!"'}],
         
         # edge cases
@@ -91,8 +91,8 @@ def test_remote_non_default_args():
         
     ]
     for given_kwargs, expected_kwargs in cases:
-        with patch('threadbare.api._execute') as mockobj:
-            api.remote(**merge(base, given_kwargs))
+        with patch('threadbare.operations._execute') as mockobj:
+            operations.remote(**merge(base, given_kwargs))
         mockobj.assert_called_with(**merge(base, expected_kwargs))
 
 def test_remote_command_exception():
@@ -105,9 +105,9 @@ def test_remote_command_exception():
     }
     m = mock.MagicMock()
     m.run_command = mock.Mock(side_effect=ValueError('earthshatteringkaboom'))
-    with patch('threadbare.api.SSHClient', return_value=m):
-        with pytest.raises(api.NetworkError):
-            api.remote(**kwargs)
+    with patch('threadbare.operations.SSHClient', return_value=m):
+        with pytest.raises(operations.NetworkError):
+            operations.remote(**kwargs)
 
 def test_remote_command_timeout_exception():
     kwargs = {
@@ -119,9 +119,9 @@ def test_remote_command_timeout_exception():
     }
     m = mock.MagicMock()
     m.run_command = mock.Mock(side_effect=pssh_exceptions.Timeout('foobar'))
-    with patch('threadbare.api.SSHClient', return_value=m):
-        with pytest.raises(api.NetworkError) as err:
-            api.remote(**kwargs)
+    with patch('threadbare.operations.SSHClient', return_value=m):
+        with pytest.raises(operations.NetworkError) as err:
+            operations.remote(**kwargs)
         err = err.value
         assert type(err.wrapped) == pssh_exceptions.Timeout
         assert str(err) == 'Timed out trying to connect. foobar'

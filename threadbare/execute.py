@@ -1,24 +1,8 @@
 import copy
-import contextlib
 from multiprocessing import Process, Queue
 import time
 from threadbare.common import first
-
-ENV = {}
-
-@contextlib.contextmanager
-def settings(state=None, **kwargs):
-    if state == None:
-        state = ENV
-    if not isinstance(state, dict):
-        raise TypeError("state map must be a dictionary-like object, not %r" % type(state))
-    original_values = copy.deepcopy(state)
-    state.update(kwargs)
-    try:
-        yield state
-    finally:
-        state.clear()
-        state.update(original_values)
+from threadbare import state
 
 def serial(func, pool_size=None):
     """Forces the given function to run `pool_size` times.
@@ -47,7 +31,7 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         # no reference to `env` unless the worker function accepts it as a parameter.
         # and we can't rely on that.
         if env:
-            ENV.update(env)
+            state.ENV.update(env)
         result = worker_func()
         queue.put({'name': name, 'result': result})
     except BaseException as unhandled_exception:
@@ -127,13 +111,13 @@ def _serial_execution(env, func, param_key, param_values):
     result_list = []
     if param_key and param_values:
         for x in param_values:
-            with settings(env, **{param_key: x}):
+            with state.settings(env, **{param_key: x}):
                 result_list.append(func())
     else:
         # pretty boring :(
         # I could set '_idx' or something in `env` I suppose ..
         for _ in range(0, getattr(func, 'pool_size', 1)):
-            with settings(env):
+            with state.settings(env):
                 result_list.append(func())
     return result_list
 

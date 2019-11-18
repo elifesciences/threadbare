@@ -1,9 +1,9 @@
-import threadbare
-from threadbare.api import remote
+from threadbare.state import settings
+from threadbare.operations import remote
 
 def main():
     # it's embarassing how nice it is to play with global state...
-    with threadbare.settings(user='elife', host='34.201.187.7', quiet=False, discard_output=False) as env:
+    with settings(user='elife', host='34.201.187.7', quiet=False, discard_output=False) as env:
         #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
         #result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
         #result = remote_sudo('salt-call state.highstate')
