@@ -45,7 +45,7 @@ def test_deleted_state():
 def test_deleted_state_2():
     "state is restored when a value is removed"
     env = {'foo': 'bar'}
-    with settings(env) as newenv:
+    with settings(env):
         env.pop('foo')
         assert env == {}
     assert env == {'foo': 'bar'}

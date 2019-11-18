@@ -1,7 +1,36 @@
 from pssh.clients.native import SSHClient
+from pssh import exceptions as pssh_exceptions
 import os, sys
 import threadbare
 from threadbare.common import merge, subdict
+
+class NetworkError(BaseException):
+    """generic 'died while doing something ssh-related' catch-all exception class.
+    calling str() on this exception will return the results on calling str() on the 
+    wrapped exception."""
+    def __init__(self, wrapped_exception_inst):
+        self.wrapped = wrapped_exception_inst
+
+    def __str__(self):
+        # we have the opportunity here to tweak the error messages to make them
+        # similar with their equivalents in Fabric.
+        # original error messages are still available via `str(exinst.wrapped)`
+        space = " "
+        custom_error_prefixes = {
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
+            pssh_exceptions.Timeout: "Timed out trying to connect." + space,
+
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
+            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
+            pssh_exceptions.SSHException: "Low level socket error connecting to host." + space,
+            pssh_exceptions.SessionError: "Low level socket error connecting to host." + space,
+            pssh_exceptions.ConnectionErrorException: "Low level socket error connecting to host." + space,
+        }
+        new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
+        original_error = str(self.wrapped)
+        return new_error + original_error
 
 # utils
 
@@ -52,9 +81,15 @@ def sudo_wrap_command(command):
 
 # api
 
+# todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
+# should probably be wrapped `__init__/execute`
 def _execute(command, user, private_key_file, host, port, use_pty):
+    """creates an SSHClient object and executes given `command` with the given parameters.
+    it does not consult global state and all parameters must be explicitly passed in.
+    keep this function as simple as possible."""
+
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-    password = None
+    password = None # we *never* use passwords, not even for bootstrapping. always private keys.
     client = SSHClient(host, user, password, port, pkey=private_key_file)
     
     # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
@@ -62,18 +97,27 @@ def _execute(command, user, private_key_file, host, port, use_pty):
     shell = False # handled ourselves
     timeout = None # todo
     encoding = 'utf-8' # default everywhere
-    channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
 
-    def get_exitcode():
-        client.wait_finished(channel) # timeout here
-        return channel.get_exit_status()
+    try:
+        channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
 
-    return {
-        'return_code': get_exitcode,
-        'command': command,
-        'stdout': stdout,
-        'stderr': stderr,
-    }
+        def get_exitcode():
+            """we can't know the exit code until command has finished running.
+            attempting to realise the exitcode will cause the thread of execution to block until 
+            the channel is finished"""
+            client.wait_finished(channel) # `timeout` here
+            return channel.get_exit_status()
+
+        return {
+            'return_code': get_exitcode,
+            'command': command,
+            'stdout': stdout,
+            'stderr': stderr,
+        }
+    except BaseException as ex:
+        # *most likely* a network error:
+        # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
+        raise NetworkError(ex)
 
 def streaming_print(output_pipe, quiet, discard_output, line):
     """writes the given `line` (string) to the given `output_pipe` (file-like object) if `quiet` is True. 
@@ -150,7 +194,8 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=F
     final_kwargs = merge(base_kwargs, user_kwargs, global_kwargs, cmd_kwargs)
 
     # print('args to execute:',final_kwargs)
-    
+
+
     result = _execute(**final_kwargs)
 
     result.update({
@@ -162,6 +207,7 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=F
     })
 
     return result
+
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
 def remote_sudo(command, **kwargs):
@@ -180,8 +226,9 @@ def main():
         #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
         #result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
         #result = remote_sudo('salt-call state.highstate')
+        result = remote('foo=bar; echo "bar? $foo!"', use_shell=False)
         # read from stdin
-        result = remote('echo "> "; cat -')
+        #result = remote('echo "> "; cat -')
 
         if env.get('quiet', False) and not env.get('discard_output', False):
             print('---')

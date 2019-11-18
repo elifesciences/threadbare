@@ -99,8 +99,6 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
 
     result_map = {} # {process-name: process-results, ...}
 
-    #print('pool', list(map(status, pool)))
-    
     # poll the processes until all are complete
     # remove process from pool when it is complete
     while len(pool) > 0:
