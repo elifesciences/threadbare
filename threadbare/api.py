@@ -1,3 +1,4 @@
+import getpass
 from pssh.clients.native import SSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
@@ -102,9 +103,9 @@ def _execute(command, user, private_key_file, host, port, use_pty):
         channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
 
         def get_exitcode():
-            """we can't know the exit code until command has finished running.
-            attempting to realise the exitcode will cause the thread of execution to block until 
-            the channel is finished"""
+            """we can't know the exit code until command has finished running but we *can* access
+            the output streams. attempting to realise the exitcode will cause the thread of execution 
+            to block until the channel is finished"""
             client.wait_finished(channel) # `timeout` here
             return channel.get_exit_status()
 
@@ -119,28 +120,25 @@ def _execute(command, user, private_key_file, host, port, use_pty):
         # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
         raise NetworkError(ex)
 
-def streaming_print(output_pipe, quiet, discard_output, line):
-    """writes the given `line` (string) to the given `output_pipe` (file-like object) if `quiet` is True. 
-    returns the given line if `discard_output` is False
-
-    this allows some control over 
-    then fiddle about with the data after the fact.
-    if you're expecting very very large responses, `discard_output` should be set to `True`."""
+def _print_line(output_pipe, quiet, discard_output, line):
+    """writes the given `line` (string) to the given `output_pipe` (file-like object)
+    if `quiet` is False, `line` is not written.
+    if `discard_output` is False, `line` is not returned.
+    `discard_output` should be set to `True` when you're expecting very large responses."""
     if not quiet:
         output_pipe.write(line + "\n")
     if not discard_output:
         return line
 
 def _process_output(output_pipe, result_list, quiet, discard_output):
-    cmd_kwargs = subdict(locals(), ['quiet', 'discard_output'])
-    global_kwargs = subdict(threadbare.ENV, ['quiet', 'discard_output'])
-    kwargs = merge(cmd_kwargs, global_kwargs)
+    "calls `_print_line` on each result in `result_list`."
+    kwargs = subdict(locals(), ['quiet', 'discard_output'])
 
     # always process the results as soon as we have them
     # use `quiet` to hide the printing of output to stdout/stderr
     # use `discard_output` to discard the results as soon as they are read
     # stderr may be empty if `combine_stderr` in `remote` was `True`
-    new_results = [streaming_print(output_pipe, line=line, **kwargs) for line in result_list]
+    new_results = [_print_line(output_pipe, line=line, **kwargs) for line in result_list]
     output_pipe.flush()
     if not kwargs['discard_output']:
         return new_results
@@ -148,59 +146,71 @@ def _process_output(output_pipe, result_list, quiet, discard_output):
 # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L898-L901
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L975
-def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=False, discard_output=False, **kwargs):
+def remote(command, **kwargs):
+    "preprocesses given `command` and options before sending it to `_execute` to be executed on remote host"
+
+    # Fabric function signature for `run`
     #shell=True # done
     #pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
     #combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
-    #quiet=False,
-    #warn_only=False
-    #stdout=None # ignore
-    #stderr=None # ignore
+    #quiet=False, # done
+    #warn_only=False # ignore
+    #stdout=None # done, stdout/stderr always available unless explicitly discarded. 'see discard_output'
+    #stderr=None # done, stderr not available when combine_stderr is `True`
     #timeout=None # todo
     #shell_escape=None # ignored. shell commands are always escaped
     #capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
 
-    # wrap the command up
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
-    if use_shell:
-        command = shell_wrap_command(command)
-    if use_sudo:
-        command = sudo_wrap_command(command)
-
-    # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
-    # bug or expected behaviour in parallel-ssh?
-    use_pty = combine_stderr
-
-    # values stored in global state, if any (global state is *empty* by default)
-    global_kwargs = subdict(threadbare.ENV, ['user', 'host', 'port', 'private_key_file'])
-
-    # values that would otherwise be function parameter defaults or calculated somewhere
-    # should these live here?
+    # parameters we're interested in and their default values
     base_kwargs = {
+        # current user. sensible default but probably not what you want
+        'user': getpass.getuser(),
+        'host': None,
         'private_key_file': os.path.expanduser("~/.ssh/id_rsa"),
-        'port': 22
+        'port': 22,
+        'use_shell': True,
+        'use_sudo': False,
+        'combine_stderr': True,
+        'quiet': False,
+        'discard_output': False,
     }
 
-    # values the user has passed in - *explicit* overrides
-    user_kwargs = subdict(kwargs, ['user', 'host', 'port', 'private_key_file'])
+    # values available in global state, if any - implicit overrides
+    global_kwargs = subdict(threadbare.ENV, base_kwargs.keys())
+    
+    # values user passed in - explicit overrides
+    user_kwargs = subdict(kwargs, base_kwargs.keys())
 
-    # values `remote` specifically passes to `_execute`, overriding all others
-    cmd_kwargs = {
+    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+
+    # wrap the command up
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
+    if final_kwargs['use_shell']:
+        command = shell_wrap_command(command)
+    if final_kwargs['use_sudo']:
+        command = sudo_wrap_command(command)
+        
+    # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
+    # bug or expected behaviour in parallel-ssh?
+    use_pty = final_kwargs['combine_stderr']
+    
+    # values `remote` specifically passes to `_execute`
+    execute_kwargs = {
         'command': command,
         'use_pty': use_pty
     }
+    execute_kwargs = merge(final_kwargs, execute_kwargs)
+    execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'private_key_file', 'host', 'port', 'use_pty'])
+    # TODO: validate `_execute`s args. `host` can't be None for example
 
-    # final dictionary of keyword parameters that `_execute` receives
-    final_kwargs = merge(base_kwargs, user_kwargs, global_kwargs, cmd_kwargs)
+    # run command
+    result = _execute(**execute_kwargs)
 
-    # print('args to execute:',final_kwargs)
-
-
-    result = _execute(**final_kwargs)
-
+    # handle stdout/stderr streams
+    output_kwargs = subdict(final_kwargs, ['quiet', 'discard_output'])
     result.update({
-        'stdout': _process_output(sys.stdout, result['stdout'], quiet, discard_output),
-        'stderr': _process_output(sys.stderr, result['stderr'], quiet, discard_output),
+        'stdout': _process_output(sys.stdout, result['stdout'], **output_kwargs),
+        'stderr': _process_output(sys.stderr, result['stderr'], **output_kwargs),
 
         # command must have finished before we have access to return code
         'return_code': result['return_code'](), 
@@ -211,36 +221,8 @@ def remote(command, use_shell=True, use_sudo=False, combine_stderr=True, quiet=F
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
 def remote_sudo(command, **kwargs):
+    "exactly the same as `remote`, but the given command is run as the root user"
     # user=None  # ignore
     # group=None # ignore
     kwargs['use_sudo'] = True
     return remote(command, **kwargs)
-
-#
-#
-#
-
-def main():
-    # it's embarassing how nice it is to play with global state...
-    with threadbare.settings(user='elife', host='34.201.187.7', quiet=False, discard_output=False) as env:
-        #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
-        #result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
-        #result = remote_sudo('salt-call state.highstate')
-        result = remote('foo=bar; echo "bar? $foo!"', use_shell=False)
-        # read from stdin
-        #result = remote('echo "> "; cat -')
-
-        if env.get('quiet', False) and not env.get('discard_output', False):
-            print('---')
-            for line in result['stdout']:
-                print('stdout:',line)
-
-            for line in result['stderr']:
-                print('stderr:',line)
-
-        print('---')
-        
-        print('results:',result)
-    
-if __name__ == '__main__':
-    main()

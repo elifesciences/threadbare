@@ -14,6 +14,15 @@ def merge(*dict_list):
         return c
     return reduce(reduce_fn, dict_list)
 
+def merge2(*dict_list):
+    "merges a list of dictionaries from left to right"
+    def reduce_fn(a, b=None):
+        c = {}
+        c.update(a)
+        c.update(b or {})
+        return c
+    return reduce(reduce_fn, dict_list)
+
 def subdict(d, key_list):
     key_list = key_list or []
     return {key: d[key] for key in key_list if key in d}
