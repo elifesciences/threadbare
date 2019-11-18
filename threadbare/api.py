@@ -2,7 +2,7 @@ import getpass
 from pssh.clients.native import SSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
-import threadbare
+from threadbare import state
 from threadbare.common import merge, subdict
 
 class NetworkError(BaseException):
@@ -176,7 +176,7 @@ def remote(command, **kwargs):
     }
 
     # values available in global state, if any - implicit overrides
-    global_kwargs = subdict(threadbare.ENV, base_kwargs.keys())
+    global_kwargs = subdict(state.ENV, base_kwargs.keys())
     
     # values user passed in - explicit overrides
     user_kwargs = subdict(kwargs, base_kwargs.keys())
