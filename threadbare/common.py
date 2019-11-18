@@ -13,11 +13,11 @@ def first(x):
 
 def merge(*dict_list):
     "non-destructively merges a series of dictionaries from left to right, returning a new dictionary"
-    def reduce_fn(a, b=None):
-        c = {}
-        c.update(a)
-        c.update(b or {})
-        return c
+    def reduce_fn(d1, d2=None):
+        d3 = {}
+        d3.update(d1)
+        d3.update(d2 or {})
+        return d3
     return reduce(reduce_fn, dict_list)
 
 def subdict(d, key_list):
