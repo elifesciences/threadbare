@@ -241,17 +241,15 @@ def test_execute_many_parallel_raw_results():
     param_key = 'mykey'
     param_values = [1, 2, 3]
     expected = [
-        {'pid': 28000, 'name': 'process--1', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 1}},
-        {'pid': 28000, 'name': 'process--2', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 2}},
-        {'pid': 28000, 'name': 'process--3', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 3}}]
-    results = threadbare._parallel_execution(env, parallel_fn, param_key, param_values)
+        {'name': 'process--1', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 1}},
+        {'name': 'process--2', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 2}},
+        {'name': 'process--3', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 3}}]
+    result_list = threadbare._parallel_execution(env, parallel_fn, param_key, param_values)
 
-    def update(d, k, v):
-        d[k] = v
-        return d
+    # process pid is available but is not compared during testing. it's non-deterministic
+    [result.pop('pid') for result in result_list]
 
-    results = [update(result, 'pid', 28000) for result in expected]
-    assert expected == results
+    assert expected == result_list
 
 def test_parallel_terminate():
     "when a process is terminated, ensure internal state is what we expect it to be"
