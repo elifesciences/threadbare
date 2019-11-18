@@ -1,8 +1,8 @@
 import copy
 import contextlib
 from multiprocessing import Process, Queue
-import os, time
-from threadbare.common import subdict, merge, first
+import time
+from threadbare.common import first
 
 ENV = {}
 

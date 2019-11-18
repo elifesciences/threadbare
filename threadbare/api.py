@@ -1,9 +1,7 @@
 from pssh.clients.native import SSHClient
 import os, sys
-import socket
 import threadbare
-from threadbare.common import merge, update, identity, subdict
-from functools import partial
+from threadbare.common import merge, subdict
 
 # utils
 
