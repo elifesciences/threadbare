@@ -84,14 +84,14 @@ def sudo_wrap_command(command):
 
 # todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
 # should probably be wrapped `__init__/execute`
-def _execute(command, user, private_key_file, host, port, use_pty):
+def _execute(command, user, key_filename, host, port, use_pty):
     """creates an SSHClient object and executes given `command` with the given parameters.
     it does not consult global state and all parameters must be explicitly passed in.
     keep this function as simple as possible."""
 
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
     password = None # we *never* use passwords, not even for bootstrapping. always private keys.
-    client = SSHClient(host, user, password, port, pkey=private_key_file)
+    client = SSHClient(host, user, password, port, pkey=key_filename)
     
     # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
     sudo = False # handled ourselves
@@ -166,7 +166,7 @@ def remote(command, **kwargs):
         # current user. sensible default but probably not what you want
         'user': getpass.getuser(),
         'host': None,
-        'private_key_file': os.path.expanduser("~/.ssh/id_rsa"),
+        'key_filename': os.path.expanduser("~/.ssh/id_rsa"),
         'port': 22,
         'use_shell': True,
         'use_sudo': False,
@@ -200,7 +200,7 @@ def remote(command, **kwargs):
         'use_pty': use_pty
     }
     execute_kwargs = merge(final_kwargs, execute_kwargs)
-    execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'private_key_file', 'host', 'port', 'use_pty'])
+    execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'key_filename', 'host', 'port', 'use_pty'])
     # TODO: validate `_execute`s args. `host` can't be None for example
 
     # run command

@@ -15,13 +15,13 @@ PEM = "/home/testuser/.ssh/id_rsa"
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
     with patch('threadbare.operations._execute') as mockobj:
-        operations.remote('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
+        operations.remote('echo hello', host=HOST, port=PORT, user=USER, key_filename=PEM)
 
     expected_kwargs = {
         'host': HOST,
         'port': PORT,
         'user': USER,
-        'private_key_file': PEM,
+        'key_filename': PEM,
         
         'use_pty': True,
         'command': '/bin/bash -l -c "echo hello"'
@@ -31,13 +31,13 @@ def test_remote_args_to_execute():
 def test_remote_sudo_args_to_execute():
     "`operations.remote_sudo` calls `operations._execute` with the correct arguments"
     with patch('threadbare.operations._execute') as mockobj:
-        operations.remote_sudo('echo hello', host=HOST, port=PORT, user=USER, private_key_file=PEM)
+        operations.remote_sudo('echo hello', host=HOST, port=PORT, user=USER, key_filename=PEM)
 
     expected_kwargs = {
         'host': HOST,
         'port': PORT,
         'user': USER,
-        'private_key_file': PEM,
+        'key_filename': PEM,
 
         'use_pty': True,
         'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'
@@ -52,7 +52,7 @@ def test_remote_non_default_args():
         'host': HOST,
         'port': PORT,
         'user': USER,
-        'private_key_file': PEM,
+        'key_filename': PEM,
         'command': 'echo hello',
     }
     
@@ -100,7 +100,7 @@ def test_remote_command_exception():
         'host': HOST,
         'port': PORT,
         'user': USER,
-        'private_key_file': PEM,
+        'key_filename': PEM,
         'command': 'echo hello',
     }
     m = mock.MagicMock()
@@ -114,7 +114,7 @@ def test_remote_command_timeout_exception():
         'host': HOST,
         'port': PORT,
         'user': USER,
-        'private_key_file': PEM,
+        'key_filename': PEM,
         'command': 'echo hello',
     }
     m = mock.MagicMock()
