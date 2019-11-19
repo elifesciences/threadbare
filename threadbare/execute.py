@@ -158,3 +158,13 @@ def execute(env, func, param_key=None, param_values=None):
         result_list = _parallel_execution(env, func, param_key, param_values)
         return [result['result'] for result in result_list]
     return _serial_execution(env, func, param_key, param_values)
+
+def execute_with_hosts(env, func, hosts=None):
+    "convenience wrapper around `execute`. calls `execute` on given `func` but uses `all_hosts`  "
+    with state.settings(env):
+        host_list = hosts or env.get('hosts') or []
+        # Fabric may know about many hosts ('all_hosts') but only be acting upon a subset of them ('hosts')
+        # https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
+        # it says 'for informational purposes only' so I'm going to disable for now
+        #env['all_hosts'] = env['hosts']
+        return execute(env, func, param_key='host', param_values=host_list)
