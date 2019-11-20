@@ -1,5 +1,5 @@
 from threadbare.state import settings
-from threadbare.operations import remote
+from threadbare import operations
 
 def handle_result(result):
     with settings() as env:
@@ -34,8 +34,16 @@ def main():
             "echo are",
             "echo you?",
         ]
-        for command in command_list:
-            handle_result(remote(command))
+        #for command in command_list:
+        #    handle_result(remote(command))
+        #print(remote_file_exists('/tmp'))
+
+        #operations.download('/var/log/daily-logrotate.log', '/tmp/daily-logrotate.log')
+        operations.remote('rm /tmp/payload')
+        operations.upload('/tmp/payload', '/tmp/payload')
+        assert operations.remote_file_exists('/tmp/payload'), "file failed to upload"
+
+    print('done')
 
 if __name__ == '__main__':
     main()

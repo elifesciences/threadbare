@@ -81,7 +81,36 @@ def sudo_wrap_command(command):
     space = " "
     return sudo_prefix + space + command
 
+def handle(base_kwargs, kwargs):
+    key_list = base_kwargs.keys()
+    global_kwargs = subdict(state.ENV, key_list)
+    user_kwargs = subdict(kwargs, key_list)
+    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+    return global_kwargs, user_kwargs, final_kwargs
+
+def rename(d, pair_list):
+    "mutator"
+    for old, new in pair_list:
+        d[new] = d[old]
+        del d[old]
+
 # api
+
+def _ssh_client(**kwargs):
+    # parameters we're interested in and their default values
+    base_kwargs = {
+        # current user. sensible default but probably not what you want
+        'user': getpass.getuser(),
+        'host_string': None,
+        'key_filename': os.path.expanduser("~/.ssh/id_rsa"),
+        'port': 22,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    final_kwargs['password'] = None # *never* use passwords, not even for bootstrapping. always private keys.
+    rename(final_kwargs, [('key_filename', 'pkey'), ('host_string', 'host')])
+
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+    return SSHClient(**final_kwargs)
 
 # todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
 # should probably be wrapped `__init__/execute`
@@ -175,17 +204,8 @@ def remote(command, **kwargs):
         'quiet': False,
         'discard_output': False,
     }
-
-    #print('global state', state.ENV)
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
     
-    # values available in global state, if any - implicit overrides
-    global_kwargs = subdict(state.ENV, base_kwargs.keys())
-    
-    # values user passed in - explicit overrides
-    user_kwargs = subdict(kwargs, base_kwargs.keys())
-
-    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
-
     # wrap the command up
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
     if final_kwargs['use_shell']:
@@ -194,7 +214,7 @@ def remote(command, **kwargs):
         command = sudo_wrap_command(command)
         
     # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
-    # bug or expected behaviour in parallel-ssh?
+    # - https://parallel-ssh.readthedocs.io/en/latest/advanced.html#combined-stdout-stderr
     use_pty = final_kwargs['combine_stderr']
     
     # values `remote` specifically passes to `_execute`
@@ -259,9 +279,7 @@ def local(command, **kwargs):
         'combine_stderr': True,
         'capture': False,
     }
-    global_kwargs = subdict(state.ENV, base_kwargs.keys())
-    user_kwargs = subdict(kwargs, base_kwargs.keys())
-    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
     if final_kwargs['capture']:
         if final_kwargs['combine_stderr']:
@@ -292,3 +310,24 @@ def local(command, **kwargs):
         'stdout': (stdout or b'').decode('utf-8').splitlines(),
         'stderr': (stderr or b'').decode('utf-8').splitlines(),
     }
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
+# use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
+def download(remote_path, local_path, **kwargs):
+    if not remote_file_exists(remote_path):
+        raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+    client = _ssh_client(**kwargs)
+    client.copy_remote_file(remote_path, local_path)
+
+def upload(local_path, remote_path, **kwargs):
+    if not os.path.exists(local_path):
+        raise EnvironmentError("local file does not exist: %s" % (local_path,))
+    # you're not crazy, sftp is *exceptionally* slow:
+    # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+    #local('du -sh %s' % local_path)
+    #client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+    #print('client',client)
+    client.copy_file(local_path, remote_path)
+    #client.pool.join()
+    #print('done')
+    #client.disconnect()
