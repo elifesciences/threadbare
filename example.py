@@ -17,11 +17,11 @@ def handle_result(result):
 
 def main():
     # it's embarassing how nice it is to play with global state...
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False) as env:
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
         #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
         #result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
         #result = remote_sudo('salt-call state.highstate')
-        result = remote('foo=bar; echo "bar? $foo!"', use_shell=False)
+        #result = remote('foo=bar; echo "bar? $foo!"', use_shell=False)
         # read from stdin
         #result = remote('echo "> "; cat -')
 
