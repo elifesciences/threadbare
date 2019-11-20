@@ -223,7 +223,6 @@ def remote(command, **kwargs):
 
     return result
 
-
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
 def remote_sudo(command, **kwargs):
     "exactly the same as `remote`, but the given command is run as the root user"
@@ -232,6 +231,25 @@ def remote_sudo(command, **kwargs):
     kwargs['use_sudo'] = True
     return remote(command, **kwargs)
 
+# https://github.com/mathiasertl/fabric/blob/master/fabric/contrib/files.py#L15
+def remote_file_exists(path, **kwargs):
+    "returns True if given path exists on remote system"
+    # note: Fabric is doing something weird and clever here:
+    # - https://github.com/mathiasertl/fabric/blob/master/fabric/contrib/files.py#L474-L485
+    # but their examples don't work:
+    '''
+    0 ✓ (3.1ms) 15:57:20 ~ $ /bin/sh
+    sh-5.0$ foo="$(echo /usr/\*/share)"
+    sh-5.0$ echo $foo
+    /usr/*/share
+    sh-5.0$ exit
+    0 ✓ (28.5s) 15:57:51 ~ $ /bin/bash
+    0 ✓ (3.0ms) 15:58:02 ~ $ foo="$(echo /usr/\*/share)"
+    0 ✓ (4.8ms) 15:58:06 ~ $ echo $foo
+    /usr/*/share
+    '''
+    command = "test -e %s" % path
+    return remote(command, **kwargs)['return_code'] == 0
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
 def local(command, **kwargs):
