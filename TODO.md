@@ -1,8 +1,8 @@
-- [ ] implement `local`
-- [ ] capture stdout + stderr (local)
+- [x] implement `local`
+- [x] capture stdout + stderr (local)
 - [x] `remote`
 - [x] capture stdout + stderr (remote)
-- [ ] implement remote_file_exists
+- [x] implement remote_file_exists
 - [ ] implement `put`
 - [ ] implement `get`
 - [ ] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
