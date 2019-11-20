@@ -3,15 +3,17 @@
 - [x] `remote`
 - [x] capture stdout + stderr (remote)
 - [x] implement remote_file_exists
-- [ ] implement `put`
-- [ ] implement `get`
+- [x] implement `put`/`upload`
+- [ ] implement `put`/`upload` 'use_sudo' hack
+- [x] implement `get`/`download`
+- [ ] implement `get`/`download` 'use_sudo' hack
 - [ ] implement `lcd`
 - [ ] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
-- [ ] implement `disconnect_all` that closes all open client connections
 - [ ] implement ssh session sharing so multiple commands can be run
+- [ ] implement `disconnect_all` that closes all open client connections
 
 regression:
 
@@ -32,12 +34,9 @@ investigate:
     - not used explicitly in builder
     - prints contents per-line rather than per-chunk-of-bytes
 
-* env `capture`
-    - used only with `local` because it behaves differently to `remote`
-        - you can't have both streaming output and captured output, apparently
-        - when capture=True, the `ssh` command appears to hang because the output is being captured, which makes sense
-            - may be a solution here, but not in scope for this project
-    - implemented
+* are we using upload/download on directories of files? 
+    - because Fabric and pssh totally support that.
+        - they're both using SFTP under the hood
 
 ignored:
 
