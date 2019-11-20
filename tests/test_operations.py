@@ -15,10 +15,10 @@ PEM = "/home/testuser/.ssh/id_rsa"
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
     with patch('threadbare.operations._execute') as mockobj:
-        operations.remote('echo hello', host=HOST, port=PORT, user=USER, key_filename=PEM)
+        operations.remote('echo hello', host_string=HOST, port=PORT, user=USER, key_filename=PEM)
 
     expected_kwargs = {
-        'host': HOST,
+        'host_string': HOST,
         'port': PORT,
         'user': USER,
         'key_filename': PEM,
@@ -31,10 +31,10 @@ def test_remote_args_to_execute():
 def test_remote_sudo_args_to_execute():
     "`operations.remote_sudo` calls `operations._execute` with the correct arguments"
     with patch('threadbare.operations._execute') as mockobj:
-        operations.remote_sudo('echo hello', host=HOST, port=PORT, user=USER, key_filename=PEM)
+        operations.remote_sudo('echo hello', host_string=HOST, port=PORT, user=USER, key_filename=PEM)
 
     expected_kwargs = {
-        'host': HOST,
+        'host_string': HOST,
         'port': PORT,
         'user': USER,
         'key_filename': PEM,
@@ -49,7 +49,7 @@ def test_remote_sudo_args_to_execute():
 def test_remote_non_default_args():
     "`operations.remote` calls `operations._execute` with the correct arguments"
     base = {
-        'host': HOST,
+        'host_string': HOST,
         'port': PORT,
         'user': USER,
         'key_filename': PEM,
@@ -97,7 +97,7 @@ def test_remote_non_default_args():
 
 def test_remote_command_exception():
     kwargs = {
-        'host': HOST,
+        'host_string': HOST,
         'port': PORT,
         'user': USER,
         'key_filename': PEM,
@@ -111,7 +111,7 @@ def test_remote_command_exception():
 
 def test_remote_command_timeout_exception():
     kwargs = {
-        'host': HOST,
+        'host_string': HOST,
         'port': PORT,
         'user': USER,
         'key_filename': PEM,

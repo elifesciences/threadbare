@@ -167,4 +167,4 @@ def execute_with_hosts(env, func, hosts=None):
         # https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
         # it says 'for informational purposes only' so I'm going to disable for now
         #env['all_hosts'] = env['hosts']
-        return execute(env, func, param_key='host', param_values=host_list)
+        return execute(env, func, param_key='host_string', param_values=host_list)

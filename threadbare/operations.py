@@ -84,14 +84,14 @@ def sudo_wrap_command(command):
 
 # todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
 # should probably be wrapped `__init__/execute`
-def _execute(command, user, key_filename, host, port, use_pty):
+def _execute(command, user, key_filename, host_string, port, use_pty):
     """creates an SSHClient object and executes given `command` with the given parameters.
     it does not consult global state and all parameters must be explicitly passed in.
     keep this function as simple as possible."""
 
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
     password = None # we *never* use passwords, not even for bootstrapping. always private keys.
-    client = SSHClient(host, user, password, port, pkey=key_filename)
+    client = SSHClient(host_string, user, password, port, pkey=key_filename)
     
     # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
     sudo = False # handled ourselves
@@ -100,7 +100,7 @@ def _execute(command, user, key_filename, host, port, use_pty):
     encoding = 'utf-8' # default everywhere
 
     try:
-        channel, host, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
+        channel, host_string, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
 
         def get_exitcode():
             """we can't know the exit code until command has finished running but we *can* access
@@ -165,7 +165,7 @@ def remote(command, **kwargs):
     base_kwargs = {
         # current user. sensible default but probably not what you want
         'user': getpass.getuser(),
-        'host': None,
+        'host_string': None,
         'key_filename': os.path.expanduser("~/.ssh/id_rsa"),
         'port': 22,
         'use_shell': True,
@@ -175,6 +175,8 @@ def remote(command, **kwargs):
         'discard_output': False,
     }
 
+    #print('global state', state.ENV)
+    
     # values available in global state, if any - implicit overrides
     global_kwargs = subdict(state.ENV, base_kwargs.keys())
     
@@ -200,9 +202,11 @@ def remote(command, **kwargs):
         'use_pty': use_pty
     }
     execute_kwargs = merge(final_kwargs, execute_kwargs)
-    execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'key_filename', 'host', 'port', 'use_pty'])
-    # TODO: validate `_execute`s args. `host` can't be None for example
+    execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'key_filename', 'host_string', 'port', 'use_pty'])
+    # TODO: validate `_execute`s args. `host_string` can't be None for example
 
+    #print('final kwargs',execute_kwargs)
+    
     # run command
     result = _execute(**execute_kwargs)
 
