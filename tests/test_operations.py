@@ -129,6 +129,21 @@ def test_remote_command_timeout_exception():
 #
 
 def test_local_shell_command():
+    "commands are run within a shell successfully"
+    command = 'echo "hello world"'
+    expected = {
+        'return_code': 0,
+        'succeeded': True,
+        'failed': False,
+        'command': '/bin/bash -l -c "echo \\"hello world\\""',
+        'stdout': [],
+        'stderr': [],
+    }
+    actual = operations.local(command)
+    assert expected == actual
+
+def test_local_shell_command_capture():
+    "when output is being captured, shell command output on stdout is available"
     command = 'echo "hello world"'
     expected = {
         'return_code': 0,
@@ -138,11 +153,25 @@ def test_local_shell_command():
         'stdout': ['hello world'],
         'stderr': [],
     }
-    actual = operations.local(command) # default is use_shell=True
+    actual = operations.local(command, capture=True)
+    assert expected == actual
+    
+def test_local_command():
+    "non-shell commands must pass their command as a list of arguments"
+    command = ['echo', "hello world"]
+    expected = {
+        'succeeded': True,
+        'failed': False,
+        'return_code': 0,
+        'command': command,
+        'stdout': [],
+        'stderr': [],
+    }
+    actual = operations.local(command, use_shell=False)
     assert expected == actual
 
-def test_local_command():
-    "non-shell commands are possible but must pass their command as a list of arguments"
+def test_local_command_capture():
+    "when output is being captured, non-shell command output on stdout is available"
     command = ['echo', "hello world"]
     expected = {
         'succeeded': True,
@@ -152,16 +181,16 @@ def test_local_command():
         'stdout': ['hello world'],
         'stderr': [],
     }
-    actual = operations.local(command, use_shell=False)
+    actual = operations.local(command, capture=True, use_shell=False)
     assert expected == actual
 
-def test_local_command_non_list():
+def test_local_command_non_arg_list():
     "non-shell commands must pass their command as a list of arguments"
     with pytest.raises(ValueError):
         operations.local('echo foo', use_shell=False)
 
 def test_local_command_stderr():
-    "stderr is combined with stdout by default"
+    "when output is being captured, stderr is combined with stdout by default"
     command = 'echo "standard out"; >&2 echo "standard error"'
     expected = {
         'succeeded': True,
@@ -171,11 +200,11 @@ def test_local_command_stderr():
         'stdout': ['standard out', 'standard error'],
         'stderr': [],
     }
-    actual = operations.local(command) # default is to combine
+    actual = operations.local(command, capture=True) # default is to combine
     assert expected == actual
 
 def test_local_command_split_stderr():
-    "stderr is available when `combine_stderr` is False"
+    "when output is being captured, output on stderr is also available when `combine_stderr` is False"
     command = 'echo "standard out"; >&2 echo "standard error"'
     expected = {
         'succeeded': True,
@@ -185,5 +214,5 @@ def test_local_command_split_stderr():
         'stdout': ['standard out'],
         'stderr': ['standard error']
     }
-    actual = operations.local(command, combine_stderr=False)
+    actual = operations.local(command, combine_stderr=False, capture=True)
     assert expected == actual

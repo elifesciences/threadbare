@@ -238,16 +238,22 @@ def local(command, **kwargs):
     base_kwargs = {
         'use_shell': True,
         'combine_stderr': True,
+        'capture': False,
     }
     global_kwargs = subdict(state.ENV, base_kwargs.keys())
     user_kwargs = subdict(kwargs, base_kwargs.keys())
     final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
 
-    out_stream = subprocess.PIPE
-    if final_kwargs['combine_stderr']:
-        err_stream = subprocess.STDOUT
+    if final_kwargs['capture']:
+        if final_kwargs['combine_stderr']:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.STDOUT
+        else:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.PIPE
     else:
-        err_stream = subprocess.PIPE
+        out_stream = None
+        err_stream = None
 
     if not final_kwargs['use_shell'] and not isinstance(command, list):
         raise ValueError("when shell=False, given command *must* be a list")
@@ -264,6 +270,6 @@ def local(command, **kwargs):
         'failed': p.returncode > 0,
         'succeeded': p.returncode == 0,
         'command': command,
-        'stdout': stdout.decode('utf-8').splitlines(),
+        'stdout': (stdout or b'').decode('utf-8').splitlines(),
         'stderr': (stderr or b'').decode('utf-8').splitlines(),
     }
