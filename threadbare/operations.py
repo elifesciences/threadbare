@@ -1,3 +1,4 @@
+import subprocess
 import getpass
 from pssh.clients.native import SSHClient
 from pssh import exceptions as pssh_exceptions
@@ -230,3 +231,39 @@ def remote_sudo(command, **kwargs):
     # group=None # ignore
     kwargs['use_sudo'] = True
     return remote(command, **kwargs)
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
+def local(command, **kwargs):
+    base_kwargs = {
+        'use_shell': True,
+        'combine_stderr': True,
+    }
+    global_kwargs = subdict(state.ENV, base_kwargs.keys())
+    user_kwargs = subdict(kwargs, base_kwargs.keys())
+    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+
+    out_stream = subprocess.PIPE
+    if final_kwargs['combine_stderr']:
+        err_stream = subprocess.STDOUT
+    else:
+        err_stream = subprocess.PIPE
+
+    if not final_kwargs['use_shell'] and not isinstance(command, list):
+        raise ValueError("when shell=False, given command *must* be a list")
+        
+    if final_kwargs['use_shell']:
+        command = shell_wrap_command(command)
+
+    p = subprocess.Popen(command, shell=final_kwargs['use_shell'], stdout=out_stream, stderr=err_stream)
+    stdout, stderr = p.communicate()
+
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1240-L1244    
+    return {
+        'return_code': p.returncode,
+        'failed': p.returncode > 0,
+        'succeeded': p.returncode == 0,
+        'command': command,
+        'stdout': stdout.decode('utf-8').splitlines(),
+        'stderr': (stderr or b'').decode('utf-8').splitlines(),
+    }

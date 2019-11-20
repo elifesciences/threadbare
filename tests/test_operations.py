@@ -126,3 +126,64 @@ def test_remote_command_timeout_exception():
         assert type(err.wrapped) == pssh_exceptions.Timeout
         assert str(err) == 'Timed out trying to connect. foobar'
 
+#
+
+def test_local_shell_command():
+    command = 'echo "hello world"'
+    expected = {
+        'return_code': 0,
+        'succeeded': True,
+        'failed': False,
+        'command': '/bin/bash -l -c "echo \\"hello world\\""',
+        'stdout': ['hello world'],
+        'stderr': [],
+    }
+    actual = operations.local(command) # default is use_shell=True
+    assert expected == actual
+
+def test_local_command():
+    "non-shell commands are possible but must pass their command as a list of arguments"
+    command = ['echo', "hello world"]
+    expected = {
+        'succeeded': True,
+        'failed': False,
+        'return_code': 0,
+        'command': command,
+        'stdout': ['hello world'],
+        'stderr': [],
+    }
+    actual = operations.local(command, use_shell=False)
+    assert expected == actual
+
+def test_local_command_non_list():
+    "non-shell commands must pass their command as a list of arguments"
+    with pytest.raises(ValueError):
+        operations.local('echo foo', use_shell=False)
+
+def test_local_command_stderr():
+    "stderr is combined with stdout by default"
+    command = 'echo "standard out"; >&2 echo "standard error"'
+    expected = {
+        'succeeded': True,
+        'failed': False,
+        'return_code': 0,
+        'command': '/bin/bash -l -c "echo \\"standard out\\"; >&2 echo \\"standard error\\""',
+        'stdout': ['standard out', 'standard error'],
+        'stderr': [],
+    }
+    actual = operations.local(command) # default is to combine
+    assert expected == actual
+
+def test_local_command_split_stderr():
+    "stderr is available when `combine_stderr` is False"
+    command = 'echo "standard out"; >&2 echo "standard error"'
+    expected = {
+        'succeeded': True,
+        'failed': False,
+        'return_code': 0,
+        'command': '/bin/bash -l -c "echo \\"standard out\\"; >&2 echo \\"standard error\\""',
+        'stdout': ['standard out'],
+        'stderr': ['standard error']
+    }
+    actual = operations.local(command, combine_stderr=False)
+    assert expected == actual
