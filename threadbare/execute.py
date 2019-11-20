@@ -67,11 +67,18 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     pool_values = param_values or range(0, pool_size)
         
     pool = []
-    for idx, n in enumerate(pool_values):
+    for idx, nth_val in enumerate(pool_values):
         kwargs['name'] = 'process--' + str(idx + 1) # process--1, process--2
         new_env = {} if not env else copy.deepcopy(env)
-        if n:
-            new_env[param_key] = n
+        #if nth_val: # why was I doing this?
+        #    new_env[param_key] = nth_val
+        new_env[param_key] = nth_val
+
+        # lets not set these until we need them:
+        # new_env['parallel'] = True
+        # new_env['linewise'] = True
+        # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L223-L227
+
         kwargs['env'] = new_env
         p = Process(name=kwargs['name'], target=_parallel_execution_worker_wrapper, kwargs=kwargs)
         p.start()
@@ -164,7 +171,12 @@ def execute_with_hosts(env, func, hosts=None):
     with state.settings(env):
         host_list = hosts or env.get('hosts') or []
         # Fabric may know about many hosts ('all_hosts') but only be acting upon a subset of them ('hosts')
-        # https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
-        # it says 'for informational purposes only' so I'm going to disable for now
+        # - https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
+        # set here:
+        # - https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L352
+        # in elife/builder we use a map of host information:
+        # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L326-L327
+        # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
+        # it says 'for informational purposes only' and nothing we use depends on it, so I'm disabling for now
         #env['all_hosts'] = env['hosts']
         return execute(env, func, param_key='host_string', param_values=host_list)
