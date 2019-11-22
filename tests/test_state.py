@@ -90,6 +90,14 @@ def test_settings_nested_closure():
 # not pretty, often hard to reason about and may lead to weird behaviour if you're not careful.
 # this is what Fabric does.
 
+def reset(fn):
+    def wrapper():
+        result = fn()
+        state.ENV = state.LockableDict()
+        state.read_only(state.ENV)
+        return result
+    return wrapper
+
 def test_global_env():
     "`settings` context manager uses global (and empty) state dictionary if a specific dictionary isn't supplied"
     assert state.ENV == {}
@@ -141,6 +149,7 @@ def test_uncontrolled_global_state_modification_2():
         assert env == {'foo': {'bar': 'bop'}}
     assert state.ENV == env == {}
 
+@reset
 def test_uncontrolled_global_state_modification_3():
     "modifications to global state outside of a context manager are prohibited UNLESS you're using own dictionary-like state object"
     assert isinstance(state.ENV, state.LockableDict)
@@ -153,4 +162,12 @@ def test_uncontrolled_global_state_modification_3():
     
     state.ENV['foo'] = 'bar'
     assert state.ENV['foo'] == 'bar'
-    
+
+def test_global_state_is_unlocked_inside_context():
+    assert isinstance(state.ENV, state.LockableDict)
+    assert state.ENV.read_only
+    with settings():
+        assert not state.ENV.read_only
+        state.ENV['foo'] = 'bar'
+    assert state.ENV.read_only
+    assert state.ENV == {}
