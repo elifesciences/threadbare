@@ -325,7 +325,7 @@ def upload(local_path, remote_path, **kwargs):
     # you're not crazy, sftp is *exceptionally* slow:
     # - https://github.com/ParallelSSH/parallel-ssh/issues/177
     #local('du -sh %s' % local_path)
-    #client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+    client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
     #print('client',client)
     client.copy_file(local_path, remote_path)
     #client.pool.join()
