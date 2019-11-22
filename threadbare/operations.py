@@ -109,8 +109,43 @@ def _ssh_client(**kwargs):
     final_kwargs['password'] = None # *never* use passwords, not even for bootstrapping. always private keys.
     rename(final_kwargs, [('key_filename', 'pkey'), ('host_string', 'host')])
 
-    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-    return SSHClient(**final_kwargs)
+    key = tuple(sorted(final_kwargs.items()))
+
+    '''
+    with state.settings() as env:
+        client_map = env.get('ssh_client', {})
+        if key in client_map:
+            client = client_map[key]
+        else:
+            # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+            client = SSHClient(**final_kwargs)
+        client_map[key] = client
+        env['ssh_client'] = client
+
+        yield client
+
+        client.disconnect()
+
+    #return client
+    '''
+
+    env = state.ENV
+    assert not env.read_only
+    client_map = env.get('ssh_client', {})
+    if key in client_map:
+        client = client_map[key]
+    else:
+        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+        client = SSHClient(**final_kwargs)
+
+        # disconnect session when leaving context manager
+        # if *not* within a context manager (tsk) then state.cleanup() can be called at any time
+        state.add_cleanup(lambda: client.disconnect())
+
+    client_map[key] = client
+    state.ENV['ssh_client'] = client_map
+
+    return client
 
 # todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
 # should probably be wrapped `__init__/execute`
@@ -120,8 +155,9 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
     keep this function as simple as possible."""
 
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-    password = None # we *never* use passwords, not even for bootstrapping. always private keys.
-    client = SSHClient(host_string, user, password, port, pkey=key_filename)
+    #password = None # we *never* use passwords, not even for bootstrapping. always private keys.
+    #client = SSHClient(host_string, user, password, port, pkey=key_filename)
+    client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
     
     # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
     sudo = False # handled ourselves
