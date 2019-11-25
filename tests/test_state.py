@@ -90,6 +90,9 @@ def test_settings_nested_closure():
 # not pretty, often hard to reason about and may lead to weird behaviour if you're not careful.
 # this is what Fabric does.
 
+# every test gets a @reset
+# if a test fails for whatever reason, it may leave the other tests in an unknown state
+# inverse is also true. a subsequent test may end up relying on the successful modification in previous test
 def reset(fn):
     def wrapper():
         result = fn()
@@ -98,6 +101,7 @@ def reset(fn):
         return result
     return wrapper
 
+@reset
 def test_global_env():
     "`settings` context manager uses global (and empty) state dictionary if a specific dictionary isn't supplied"
     assert state.ENV == {}
@@ -105,6 +109,7 @@ def test_global_env():
         assert state.ENV == {'foo': 'bar'}
     assert state.ENV == {}
 
+@reset
 def test_global_nested_state():
     "context managers can be nested for global state"
     assert state.ENV == {}
@@ -113,6 +118,7 @@ def test_global_nested_state():
             assert state.ENV == {'foo': 'bar', 'baz': 'bop'}
     assert state.ENV == {}
 
+@reset
 def test_global_overridden_state():
     "global overrides exist only for the scope of the context manager"
     assert state.ENV == {}
@@ -123,6 +129,7 @@ def test_global_overridden_state():
     assert local_env == {} 
     assert state.ENV == {}
 
+@reset
 def test_global_deleted_state():
     "original global state is restored if a value is deleted"
     assert state.ENV == {}
@@ -132,13 +139,15 @@ def test_global_deleted_state():
         assert state.ENV == env == {'bar': 'baz'}
     assert state.ENV == env == {}
 
+@reset
 def test_uncontrolled_global_state_modification():
     "modifications to global state outside of a context manager are prohibited"
     assert isinstance(state.ENV, state.LockableDict) # type check
     assert state.ENV == {} # empty value
     with pytest.raises(ValueError):
         state.ENV['foo'] = 'bar'
-    
+
+@reset
 def test_uncontrolled_global_state_modification_2():
     """modifications to global state that happen outside of the context manager's 
     control (with ... as ...) are available as expected BUT are reverted on exit"""
@@ -163,6 +172,7 @@ def test_uncontrolled_global_state_modification_3():
     state.ENV['foo'] = 'bar'
     assert state.ENV['foo'] == 'bar'
 
+@reset
 def test_global_state_is_unlocked_inside_context():
     assert isinstance(state.ENV, state.LockableDict)
     assert state.ENV.read_only
@@ -171,3 +181,66 @@ def test_global_state_is_unlocked_inside_context():
         state.ENV['foo'] = 'bar'
     assert state.ENV.read_only
     assert state.ENV == {}
+
+@reset
+def test_nested_global_state_is_unlocked_inside_context():
+    assert isinstance(state.ENV, state.LockableDict)
+    assert state.ENV.read_only
+    with settings():
+        assert not state.ENV.read_only
+        state.ENV['foo'] = 'bar'
+        
+        with settings():
+            assert not state.ENV.read_only
+
+        assert not state.ENV.read_only
+            
+    assert state.ENV.read_only
+    assert state.ENV == {}
+
+# cleanup
+
+@reset
+def test_cleanup():
+    side_effect = {}
+    def cleanup_fn():
+        side_effect['?'] = "!"
+    with settings():
+        state.add_cleanup(cleanup_fn)
+    assert side_effect['?'] == "!"
+
+def test_nested_scopes_dont_cleanup_parent_scopes():
+    "cleanup functions are only called for the scope they were added to"
+    assert False
+
+#
+
+@reset
+def test_lockable_dict():
+    foo = state.LockableDict()
+    assert not foo.read_only # default is unlocked
+    
+    state.read_only(foo)
+    assert foo.read_only
+    
+    state.read_write(foo)
+    assert not foo.read_only
+
+@reset
+def test_lockable_dict_attrs_preserved():
+    foo = state.LockableDict()
+    assert not foo.read_only # default is unlocked
+    
+    state.read_only(foo) # alter foo
+    assert foo.read_only
+
+    bar = state.deepish_copy(foo)
+    assert bar.read_only # yeah, deepish_copy isn't preserving attributes
+    #assert isinstance(bar, dict) 
+    assert isinstance(bar, state.LockableDict)
+
+    import copy
+    baz = copy.deepcopy(foo)
+    assert baz.read_only
+    assert isinstance(baz, state.LockableDict)
+    

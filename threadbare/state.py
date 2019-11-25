@@ -1,18 +1,25 @@
 import copy
 import contextlib
+import collections
 
 CLEANUP_KEY = "_cleanup"
 
 class LockableDict(dict):
-    # unlocked by default
-    # when multiprocessing starts a new process the ENV it has access to is not the same one
-    # as the one here, nor is it in the same state
-    read_only = False
-    
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.read_only = False
+
+    def update(self, new_dict):
+        if self.read_only:
+            raise ValueError("dictionary is locked attempting to `update` with %r" % new_dict)
+        dict.update(self, new_dict)
+
     def __setitem__(self, key, val):
-        #exceptions = [CLEANUP_KEY]
-        if self.read_only: # and key not in exceptions:
-            raise ValueError("dictionary is locked attempting to write %r with %r" % (key, val))
+        # I suspect multiprocessing isn't copying the custom 'read_only' attribute back
+        # from the child process results. be aware of this weirdness
+        #print("self:",self.__dict__, "data:",self)
+        if hasattr(self, 'read_only') and self.read_only:
+            raise ValueError("dictionary is locked attempting to `set` %r with %r" % (key, val))
         dict.__setitem__(self, key, val)
 
 def read_only(d):
@@ -26,28 +33,40 @@ def read_write(d):
 ENV = LockableDict()
 read_only(ENV)
 
-def cleanup(old_env):
-    if True:
-        return
-    if CLEANUP_KEY in old_env:
-        for cleanup_fn in old_env[CLEANUP_KEY]:
+# stack of previous environments for this process
+# used to determine how deeply nested we are
+# current environment is enclosed within context manager
+SHADOW = [] 
+
+def cleanup(old_state):
+    if CLEANUP_KEY in old_state:
+        for cleanup_fn in old_state[CLEANUP_KEY]:
             cleanup_fn()
-        del old_env[CLEANUP_KEY]
+        del old_state[CLEANUP_KEY]
+
+def _add_cleanup(state, fn):
+    cleanup_fn_list = state.get(CLEANUP_KEY, [])
+    cleanup_fn_list.append(fn)
+    state[CLEANUP_KEY] = cleanup_fn_list
 
 def add_cleanup(fn):
-    if True:
-        return
-    cleanup_fn_list = ENV.get(CLEANUP_KEY, [])
-    cleanup_fn_list.append(fn)
-    ENV[CLEANUP_KEY] = cleanup_fn_list
+    "add a function to a list of functions that are called after leaving the current scope of the context manager"
+    return _add_cleanup(ENV, fn)
 
 def deepish_copy(x):
+    return copy.deepcopy(x)
+    # todo: prefer custom copy method for sshclient
+    '''
+    from pssh.clients.native import SSHClient
     if isinstance(x, dict):
         return {k: deepish_copy(v) for k, v in x.items()}
     if isinstance(x, list):
         return [deepish_copy(v) for v in x]
-
-    return copy.copy(x)
+    # don't deepcopy sshclient instances
+    if isinstance(x, SSHClient):
+        return x
+    return copy.deepcopy(x)
+    '''
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
@@ -56,16 +75,29 @@ def settings(state=None, **kwargs):
     if not isinstance(state, dict):
         raise TypeError("state map must be a dictionary-like object, not %r" % type(state))
 
-    read_write(state)
+    # deepcopy will attempt to pickle and unpickle all objects in state
+    # we can't guarantee what will live in state and if it's possible to pickle it or not
+    # the SSHClient is one such unserialisable object
+    # another approach would be to relax guarantees that the environment is completely reverted
+
     #original_values = copy.deepcopy(state)
     original_values = deepish_copy(state)
+    SHADOW.append(original_values)
+
+    read_write(state)
     state.update(kwargs)
+    # TODO: ensure child context processors don't clean up their parents
     #if CLEANUP_KEY in state:
     #    state.update({CLEANUP_KEY: []})
     try:
         yield state
     finally:
         cleanup(state)
-        read_only(state)
         state.clear()
         state.update(original_values)
+        SHADOW.pop()
+        
+        # we're leaving the top-most context decorator
+        # ensure state dictionary is marked as read-only
+        if not SHADOW:
+            read_only(state)

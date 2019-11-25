@@ -30,8 +30,8 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         # implicit `settings() as env` invocation rather than `settings(env)` as we have
         # no reference to `env` unless the worker function accepts it as a parameter.
         # and we can't rely on that.
-        if env:
-            state.ENV.update(env)
+        state.read_write(state.ENV)
+        state.ENV.update(env or {})
         result = worker_func()
         queue.put({'name': name, 'result': result})
     except BaseException as unhandled_exception:
