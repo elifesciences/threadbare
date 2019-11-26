@@ -93,7 +93,7 @@ def test_remote_non_default_args():
     for given_kwargs, expected_kwargs in cases:
         with patch('threadbare.operations._execute') as mockobj:
             operations.remote(**merge(base, given_kwargs))
-        mockobj.assert_called_with(**merge(base, expected_kwargs))
+            mockobj.assert_called_with(**merge(base, expected_kwargs))
 
 def test_remote_command_exception():
     kwargs = {
