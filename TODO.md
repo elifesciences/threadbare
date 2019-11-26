@@ -12,16 +12,12 @@
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
-- [ ] implement ssh session sharing so multiple commands can be run
-- [ ] implement `disconnect_all` that closes all open client connections
-
-regression:
-
-* builder 'cmd' running a task in parallel is hanging
-    - used to work
-    - no traceback
+- [x] implement ssh session sharing so multiple commands can be run
 
 investigate:
+
+* SFTP (default for pssh and fabric) is excruciatingly slow
+    - can we safely switch to SCP?
 
 * pssh is emitting log lines:
     - `INFO - pssh.host_logger - [34.201.187.7]	hello`
@@ -39,6 +35,10 @@ investigate:
         - they're both using SFTP under the hood
 
 ignored:
+
+* implement `disconnect_all` that closes all open client connections
+    - client connections are closed automatically when the context is left
+        - I *think* Fabric handles these differently with it's `clean_revert` setting that would leave connections hanging around still open
 
 * env `parallel` - does the presence of this automatically do something in parallel??
     - no, see: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L223-L227
