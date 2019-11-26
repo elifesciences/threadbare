@@ -24,3 +24,10 @@ def subdict(d, key_list):
     "returns a subset of the given dictionary `d` for keys in `key_list`"
     key_list = key_list or []
     return {key: d[key] for key in key_list if key in d}
+
+def rename(d, pair_list):
+    "mutator. given a dictionary `d` and a list of (old-name, new-name) pairs, renames old-name to new-name, if it exists"
+    for old, new in pair_list:
+        if old in d:
+            d[new] = d[old]
+            del d[old]

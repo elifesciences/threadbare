@@ -4,10 +4,10 @@ from pssh.clients.native import SSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
-from threadbare.common import merge, subdict
+from threadbare.common import merge, subdict, rename
 
 class SSHClient(PSSHClient):
-    # what we're saying is *don't* deepcopy the pssh SSHClient object,
+    # do not copy.deepcopy the pssh SSHClient object, just
     # return a reference to the object (self)
     # - https://docs.python.org/3/library/copy.html
     def __deepcopy__(self, memo):
@@ -95,15 +95,13 @@ def handle(base_kwargs, kwargs):
     final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
     return global_kwargs, user_kwargs, final_kwargs
 
-def rename(d, pair_list):
-    "mutator"
-    for old, new in pair_list:
-        d[new] = d[old]
-        del d[old]
-
 # api
 
 def _ssh_client(**kwargs):
+    """returns an instance of pssh.clients.native.SSHClient
+    if within a state context, looks for a client already in use and returns that if found.
+    if not found, creates a new one and stores it for later use."""
+    
     # parameters we're interested in and their default values
     base_kwargs = {
         # current user. sensible default but probably not what you want
@@ -113,44 +111,32 @@ def _ssh_client(**kwargs):
         'port': 22,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
-    final_kwargs['password'] = None # *never* use passwords, not even for bootstrapping. always private keys.
+    final_kwargs['password'] = None # always private keys
     rename(final_kwargs, [('key_filename', 'pkey'), ('host_string', 'host')])
 
-    key = tuple(sorted(final_kwargs.items()))
-
-    '''
-    with state.settings() as env:
-        client_map = env.get('ssh_client', {})
-        if key in client_map:
-            client = client_map[key]
-        else:
-            # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-            client = SSHClient(**final_kwargs)
-        client_map[key] = client
-        env['ssh_client'] = client
-
-        yield client
-
-        client.disconnect()
-
-    #return client
-    '''
-
+    # if we're not using global state, return the new client as-is
     env = state.ENV
-    assert not env.read_only
-    client_map = env.get('ssh_client', {})
-    if key in client_map:
-        client = client_map[key]
-    else:
-        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-        client = SSHClient(**final_kwargs)
+    if env.read_only:
+        return SSHClient(**final_kwargs)
 
-        # disconnect session when leaving context manager
-        # if *not* within a context manager (tsk) then state.cleanup() can be called at any time
-        state.add_cleanup(lambda: client.disconnect())
+    client_map_key = "ssh_client"
+    client_key = tuple(sorted(final_kwargs.items()))
+    
+    # otherwise, check to see if a previous client is available
+    client_map = env.get(client_map_key, {})
+    if client_key in client_map:
+        return client_map[client_key]
 
-    client_map[key] = client
-    state.ENV['ssh_client'] = client_map
+    # if not, create a new one and store it in the state
+
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+    client = SSHClient(**final_kwargs)
+
+    # disconnect session when leaving context manager
+    state.add_cleanup(lambda: client.disconnect())
+
+    client_map[client_key] = client
+    env[client_map_key] = client_map
 
     return client
 
@@ -161,9 +147,6 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
     it does not consult global state and all parameters must be explicitly passed in.
     keep this function as simple as possible."""
 
-    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
-    #password = None # we *never* use passwords, not even for bootstrapping. always private keys.
-    #client = SSHClient(host_string, user, password, port, pkey=key_filename)
     client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
     
     # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408

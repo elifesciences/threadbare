@@ -1,7 +1,7 @@
 import pytest
 import unittest.mock as mock
 from unittest.mock import patch
-from threadbare import operations, state
+from threadbare import operations
 from threadbare.common import merge
 from pssh import exceptions as pssh_exceptions
 
@@ -91,10 +91,9 @@ def test_remote_non_default_args():
         
     ]
     for given_kwargs, expected_kwargs in cases:
-        with state.settings():
-            with patch('threadbare.operations._execute') as mockobj:
-                operations.remote(**merge(base, given_kwargs))
-                mockobj.assert_called_with(**merge(base, expected_kwargs))
+        with patch('threadbare.operations._execute') as mockobj:
+            operations.remote(**merge(base, given_kwargs))
+            mockobj.assert_called_with(**merge(base, expected_kwargs))
 
 def test_remote_command_exception():
     kwargs = {
@@ -106,10 +105,9 @@ def test_remote_command_exception():
     }
     m = mock.MagicMock()
     m.run_command = mock.Mock(side_effect=ValueError('earthshatteringkaboom'))
-    with state.settings():
-        with patch('threadbare.operations.SSHClient', return_value=m):
-            with pytest.raises(operations.NetworkError):
-                operations.remote(**kwargs)
+    with patch('threadbare.operations.SSHClient', return_value=m):
+        with pytest.raises(operations.NetworkError):
+            operations.remote(**kwargs)
 
 def test_remote_command_timeout_exception():
     kwargs = {
@@ -121,13 +119,12 @@ def test_remote_command_timeout_exception():
     }
     m = mock.MagicMock()
     m.run_command = mock.Mock(side_effect=pssh_exceptions.Timeout('foobar'))
-    with state.settings():
-        with patch('threadbare.operations.SSHClient', return_value=m):
-            with pytest.raises(operations.NetworkError) as err:
-                operations.remote(**kwargs)
-            err = err.value
-            assert type(err.wrapped) == pssh_exceptions.Timeout
-            assert str(err) == 'Timed out trying to connect. foobar'
+    with patch('threadbare.operations.SSHClient', return_value=m):
+        with pytest.raises(operations.NetworkError) as err:
+            operations.remote(**kwargs)
+        err = err.value
+        assert type(err.wrapped) == pssh_exceptions.Timeout
+        assert str(err) == 'Timed out trying to connect. foobar'
 
 #
 

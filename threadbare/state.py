@@ -32,10 +32,8 @@ def read_write(d):
 ENV = LockableDict()
 read_only(ENV)
 
-# stack of previous environments for this process
 # used to determine how deeply nested we are
-# current environment is enclosed within context manager
-SHADOW = [] 
+DEPTH = 0
 
 def cleanup(old_state):
     if CLEANUP_KEY in old_state:
@@ -54,6 +52,8 @@ def add_cleanup(fn):
 
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
+    global DEPTH
+
     if state == None:
         state = ENV
     if not isinstance(state, dict):
@@ -65,7 +65,7 @@ def settings(state=None, **kwargs):
     # another approach would be to relax guarantees that the environment is completely reverted
 
     original_values = copy.deepcopy(state)
-    SHADOW.append(original_values)
+    DEPTH += 1
 
     read_write(state)
     state.update(kwargs)
@@ -80,9 +80,10 @@ def settings(state=None, **kwargs):
         cleanup(state)
         state.clear()
         state.update(original_values)
-        SHADOW.pop()
+
+        DEPTH -= 1
         
         # we're leaving the top-most context decorator
         # ensure state dictionary is marked as read-only
-        if not SHADOW:
+        if DEPTH == 0:
             read_only(state)

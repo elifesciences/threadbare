@@ -175,6 +175,7 @@ def test_uncontrolled_global_state_modification_3():
 
 @reset
 def test_global_state_is_unlocked_inside_context():
+    "`state.ENV` is only writeable within the context manager"
     assert isinstance(state.ENV, state.LockableDict)
     assert state.ENV.read_only
     with settings():
@@ -185,6 +186,7 @@ def test_global_state_is_unlocked_inside_context():
 
 @reset
 def test_nested_global_state_is_unlocked_inside_context():
+    "`state.ENV` is only writeable within the context manager, including nested context managers"
     assert isinstance(state.ENV, state.LockableDict)
     assert state.ENV.read_only
     with settings():
@@ -199,16 +201,42 @@ def test_nested_global_state_is_unlocked_inside_context():
     assert state.ENV.read_only
     assert state.ENV == {}
 
+@reset
+def test_lockable_dict():
+    "a lockable dictionary has a simple locked/unlocked boolean preventing write access. default is unlocked"
+    foo = state.LockableDict()
+    assert not foo.read_only
+    
+    state.read_only(foo)
+    assert foo.read_only
+    
+    state.read_write(foo)
+    assert not foo.read_only
+
+@reset
+def test_lockable_dict_attrs_preserved():
+    "creating a copy of a LockableDict objects preserves the state of the locked/unlocked boolean"
+    foo = state.LockableDict()
+    assert not foo.read_only
+    
+    state.read_only(foo) # alter foo
+    assert foo.read_only
+
+    baz = copy.deepcopy(foo) # happens when we context shift
+    assert baz.read_only
+    assert isinstance(baz, state.LockableDict)
+    
 # cleanup
 
 @reset
 def test_cleanup():
-    side_effect = {}
+    "'cleanup' functions can be added that will be executed when the context manager is left"
+    side_effects = {}
     def cleanup_fn():
-        side_effect['?'] = "!"
+        side_effects['?'] = "!"
     with settings():
         state.add_cleanup(cleanup_fn)
-    assert side_effect['?'] == "!"
+    assert side_effects['?'] == "!"
 
 def test_nested_scopes_dont_cleanup_parent_scopes():
     "cleanup functions are only called for the scope they were added to"
@@ -223,28 +251,3 @@ def test_nested_scopes_dont_cleanup_parent_scopes():
             state.add_cleanup(cleanup_fn_2)
         assert side_effects == {'2': 'scope 2 cleaned up'}
     assert side_effects == {'2': 'scope 2 cleaned up', '1': 'scope 1 cleaned up'}
-
-#
-
-@reset
-def test_lockable_dict():
-    foo = state.LockableDict()
-    assert not foo.read_only # default is unlocked
-    
-    state.read_only(foo)
-    assert foo.read_only
-    
-    state.read_write(foo)
-    assert not foo.read_only
-
-@reset
-def test_lockable_dict_attrs_preserved():
-    foo = state.LockableDict()
-    assert not foo.read_only # default is unlocked
-    
-    state.read_only(foo) # alter foo
-    assert foo.read_only
-
-    baz = copy.deepcopy(foo) # happens when we context shift
-    assert baz.read_only
-    assert isinstance(baz, state.LockableDict)
