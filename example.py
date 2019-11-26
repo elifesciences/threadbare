@@ -1,9 +1,9 @@
-from threadbare import operations, state
+from threadbare import state
 from threadbare.state import settings
-from threadbare.operations import remote
+from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload
 
-def handle_result_1(result):
-    env = state.ENV # global mutable state, beware.
+def handle_result(result):
+    env = state.ENV # or, `with settings() as env` works just as well
     if env.get('quiet', False) and not env.get('discard_output', False):
         print('---')
         for line in result['stdout']:
@@ -16,59 +16,88 @@ def handle_result_1(result):
         
     print('results:',result)
 
-def handle_result_2(result):
-    with settings() as env:
-        if env.get('quiet', False) and not env.get('discard_output', False):
-            print('---')
-            for line in result['stdout']:
-                print('out:',line)
+def run_a_remote_command():
+    with settings(quiet=False):
+        print(remote(r'echo -e "\e[31mDanger Will Robinson!\e[0m"', use_shell=False))
+        print(remote('echo "standard out"; >&2 echo "standard error"; exit 123', combine_stderr=False))
+        print(remote('foo=bar; echo "bar? $foo!"', use_shell=False))
 
-            for line in result['stderr']:
-                print('err:',line)
-
-        print('---')
-        
-        print('results:',result)
-
-def main():
-    with settings(nest=0):
-        print('hi')
-        with settings(nest=1):
-            print('hello')
-            with settings(nest=2):
-                print('hey')
-
-    assert state.ENV.read_only
-                
-    return
+def run_a_local_command():
+    print(local("echo hello, world!"))
     
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        #result = remote(r'echo -e "\e[31mRed Text\e[0m"', use_shell=False)
-        #result = remote('echo "standard out"; echo "sleeping"; sleep 2; >&2 echo "standard error"; exit 2', combine_stderr=False)
-        #result = remote_sudo('salt-call state.highstate')
-        #result = remote('foo=bar; echo "bar? $foo!"', use_shell=False)
-        # read from stdin
-        #result = remote('echo "> "; cat -')
+def nest_some_settings():
+    with settings(foo='bar'):
+        with settings(bar='baz'):
+            with settings(baz='bup'):
+                print("After three nestings I have the cumulate state: %s" % state.ENV)
 
-        # these should all re-use the same network connection
-        # (they don't, see TODO)
+def run_many_remote_commands():
+    with settings(quiet=False):
         command_list = [
-            "echo hello,",
-            "echo world.",
-            "echo how",
-            "echo are",
-            "echo you?",
+            "echo all",
+            "echo these commands",
+            "echo share the same",
+            "echo ssh session"
         ]
         for command in command_list:
-            handle_result_1(remote(command))
-            
-        #print(remote_file_exists('/tmp'))
-        #operations.download('/var/log/daily-logrotate.log', '/tmp/daily-logrotate.log')
-        #operations.remote('rm /tmp/payload')
-        #operations.upload('/tmp/payload', '/tmp/payload')
-        #assert operations.remote_file_exists('/tmp/payload'), "file failed to upload"
+            print(remote(command))
 
-    print('done')
+def run_a_remote_command_as_root():
+    print(remote_sudo("cd /root && echo tapdance in $(pwd)"))
 
+def upload_a_file(local_file_name):
+    local_file_contents = "foo"
+    with open(local_file_name, 'w') as fh:
+        fh.write(local_file_contents)
+    remote_file_name = '/tmp/threadbare-payload.tmp'
+    upload(local_file_name, remote_file_name)
+    assert remote_file_exists(remote_file_name)
+    return remote_file_name
+
+def modify_remote_file(remote_file_name):
+    remote('printf "bar" >> %s' % remote_file_name)
+
+def modify_local_file(local_file_name):
+    local('printf "baz" >> %s' % local_file_name)
+
+def download_a_file(remote_file_name):
+    new_local_file_name = '/tmp/threadbare-payload.tmp2'
+    download(remote_file_name, new_local_file_name)
+    remote('rm %s' % remote_file_name)
+    return new_local_file_name
+
+def composite_actions():
+    "write a local file, upload it to the remote server, modify it remotely, download it, modify it again, assert it's contents are as expected"
+
+    print('uploading file ...')
+    local_file_name = '/tmp/threadbare-payload.tmp'
+    uploaded_file = upload_a_file(local_file_name)
+
+    print('modifying remote file ...')
+    modify_remote_file(uploaded_file)
+
+    print('downloading file ...')
+    new_local_file_name = download_a_file(uploaded_file)
+
+    print('modifying local file ...')
+    modify_local_file(new_local_file_name)
+    
+    with open(new_local_file_name, 'r') as fh:
+        data = fh.read()
+
+    print('testing local file ...')
+    assert data == "foobarbaz"
+
+    print('good!')
+
+def main():
+    nest_some_settings()
+    run_a_local_command()
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        run_a_remote_command()
+        run_a_remote_command_as_root()
+        run_many_remote_commands()
+        composite_actions()
+        
 if __name__ == '__main__':
     main()
