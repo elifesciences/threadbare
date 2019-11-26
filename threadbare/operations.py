@@ -1,10 +1,17 @@
 import subprocess
 import getpass
-from pssh.clients.native import SSHClient
+from pssh.clients.native import SSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
 from threadbare.common import merge, subdict
+
+class SSHClient(PSSHClient):
+    # what we're saying is *don't* deepcopy the pssh SSHClient object,
+    # return a reference to the object (self)
+    # - https://docs.python.org/3/library/copy.html
+    def __deepcopy__(self, memo):
+        return self
 
 class NetworkError(BaseException):
     """generic 'died while doing something ssh-related' catch-all exception class.

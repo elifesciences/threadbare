@@ -2,6 +2,7 @@ import pytest
 from functools import partial
 from threadbare import state
 from threadbare.state import settings
+import copy
 
 # 'local' state
 # this *is not* what Fabric does
@@ -211,7 +212,17 @@ def test_cleanup():
 
 def test_nested_scopes_dont_cleanup_parent_scopes():
     "cleanup functions are only called for the scope they were added to"
-    assert False
+    side_effects = {}
+    def cleanup_fn_1():
+        side_effects['1'] = "scope 1 cleaned up"
+    def cleanup_fn_2():
+        side_effects['2'] = "scope 2 cleaned up"
+    with settings():
+        state.add_cleanup(cleanup_fn_1)
+        with settings():
+            state.add_cleanup(cleanup_fn_2)
+        assert side_effects == {'2': 'scope 2 cleaned up'}
+    assert side_effects == {'2': 'scope 2 cleaned up', '1': 'scope 1 cleaned up'}
 
 #
 
@@ -234,13 +245,6 @@ def test_lockable_dict_attrs_preserved():
     state.read_only(foo) # alter foo
     assert foo.read_only
 
-    bar = state.deepish_copy(foo)
-    assert bar.read_only # yeah, deepish_copy isn't preserving attributes
-    #assert isinstance(bar, dict) 
-    assert isinstance(bar, state.LockableDict)
-
-    import copy
-    baz = copy.deepcopy(foo)
+    baz = copy.deepcopy(foo) # happens when we context shift
     assert baz.read_only
     assert isinstance(baz, state.LockableDict)
-    

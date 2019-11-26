@@ -1,6 +1,5 @@
 import copy
 import contextlib
-import collections
 
 CLEANUP_KEY = "_cleanup"
 
@@ -53,21 +52,6 @@ def add_cleanup(fn):
     "add a function to a list of functions that are called after leaving the current scope of the context manager"
     return _add_cleanup(ENV, fn)
 
-def deepish_copy(x):
-    return copy.deepcopy(x)
-    # todo: prefer custom copy method for sshclient
-    '''
-    from pssh.clients.native import SSHClient
-    if isinstance(x, dict):
-        return {k: deepish_copy(v) for k, v in x.items()}
-    if isinstance(x, list):
-        return [deepish_copy(v) for v in x]
-    # don't deepcopy sshclient instances
-    if isinstance(x, SSHClient):
-        return x
-    return copy.deepcopy(x)
-    '''
-
 @contextlib.contextmanager
 def settings(state=None, **kwargs):
     if state == None:
@@ -77,18 +61,19 @@ def settings(state=None, **kwargs):
 
     # deepcopy will attempt to pickle and unpickle all objects in state
     # we can't guarantee what will live in state and if it's possible to pickle it or not
-    # the SSHClient is one such unserialisable object
+    # the SSHClient is one such unserialisable object that has had to be subclassed
     # another approach would be to relax guarantees that the environment is completely reverted
 
-    #original_values = copy.deepcopy(state)
-    original_values = deepish_copy(state)
+    original_values = copy.deepcopy(state)
     SHADOW.append(original_values)
 
     read_write(state)
     state.update(kwargs)
-    # TODO: ensure child context processors don't clean up their parents
-    #if CLEANUP_KEY in state:
-    #    state.update({CLEANUP_KEY: []})
+
+    # ensure child context processors don't clean up their parents
+    if CLEANUP_KEY in state:
+        state.update({CLEANUP_KEY: []})
+
     try:
         yield state
     finally:
