@@ -337,15 +337,68 @@ def local(command, **kwargs):
         'stderr': (stderr or b'').decode('utf-8').splitlines(),
     }
 
+def single_command(cmd_list):
+    "given a list of commands to run, returns a single command"
+    return ' && '.join(cmd_list) # `remote` and `local` will do any escaping as necessary
+
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
 # use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
-def download(remote_path, local_path, **kwargs):
-    if not remote_file_exists(remote_path):
+def _download_as_root_hack(remote_path, local_path, **kwargs):
+    """bit of a hack. we create a temporary readable copy of the file as root and download that, then remove the temporary file.
+    don't try to download anything huge `with_sudo`
+    this file that requires root privileges will be available on the system in /tmp until the download is complete"""
+    
+    if not remote_file_exists(remote_path, **kwargs):
         raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
     client = _ssh_client(**kwargs)
-    client.copy_remote_file(remote_path, local_path)
 
-def upload(local_path, remote_path, **kwargs):
+    cmd = single_command([
+        # create a temporary file with the suffix '-threadbare'
+        'tempfile=$(mktemp --suffix "-threadbare")',
+        # copy the target file to this temporary file
+        'cp "%s" "/tmp/$tempfile"' % remote_path,
+        # ensure it's readable by the user doing the downloading
+        'chown +r "$tempfile"',
+        # emit the name of the temporary file so we can find it to download it
+        'echo "$tempfile"'
+    ])
+    result = remote_sudo(cmd)
+    remote_tempfile=result['stdout'][-1]
+    assert remote_file_exists(remote_tempfile) # sanity check
+    remote_path = remote_tempfile
+    client.copy_remote_file(remote_tempfile, local_path)
+    remote_sudo('rm "%s"' % remote_tempfile)
+    return local_path
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
+# use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
+def download(remote_path, local_path, use_sudo=False, **kwargs):
+    """downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
+    avoid `use_sudo` if at all possible"""
+
+    if use_sudo:
+        return _download_as_root_hack(remote_path, local_path, **kwargs)
+    
+    if not remote_file_exists(remote_path, **kwargs):
+        raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+
+    client = _ssh_client(**kwargs)
+    client.copy_remote_file(remote_path, local_path)
+    return local_path
+
+def _upload_as_root_hack(local_path, remote_path, **kwargs):
+    pass
+
+def upload(local_path, remote_path, use_sudo=False, **kwargs):
+    # what does use_sudo mean in this context?
+    # "upload and move into place as root?"
+    # "upload as root?"
+    # former
+
+    if use_sudo:
+        return _upload_as_root_hack(local_path, remote_path, **kwargs)
+
     if not os.path.exists(local_path):
         raise EnvironmentError("local file does not exist: %s" % (local_path,))
     # you're not crazy, sftp is *exceptionally* slow:
