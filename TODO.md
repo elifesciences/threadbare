@@ -7,8 +7,8 @@
 - [x] implement `put`/`upload` 'use_sudo' hack
 - [x] implement `get`/`download`
 - [x] implement `get`/`download` 'use_sudo' hack
-- [ ] implement `lcd`
-- [ ] implement `rcd`
+- [x] implement `lcd`
+- [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
