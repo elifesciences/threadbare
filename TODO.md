@@ -4,9 +4,9 @@
 - [x] capture stdout + stderr (remote)
 - [x] implement remote_file_exists
 - [x] implement `put`/`upload`
-- [ ] implement `put`/`upload` 'use_sudo' hack
+- [x] implement `put`/`upload` 'use_sudo' hack
 - [x] implement `get`/`download`
-- [ ] implement `get`/`download` 'use_sudo' hack
+- [x] implement `get`/`download` 'use_sudo' hack
 - [ ] implement `lcd`
 - [ ] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
