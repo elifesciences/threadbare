@@ -89,6 +89,12 @@ def sudo_wrap_command(command):
     space = " "
     return sudo_prefix + space + command
 
+def pwd_wrap_command(command, working_dir):
+    "adds a 'cd' prefix to command"
+    prefix = 'cd "%s" &&' % working_dir
+    space = " "
+    return prefix + space + command
+
 def handle(base_kwargs, kwargs):
     key_list = base_kwargs.keys()
     global_kwargs = subdict(state.ENV, key_list)
@@ -106,6 +112,13 @@ def lcd(local_dir):
         current_dir = cwd()
         state.add_cleanup(lambda: os.chdir(current_dir))
         os.chdir(local_dir)
+        yield
+
+@contextlib.contextmanager
+def rcd(remote_working_dir):
+    "ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run"
+    with state.settings() as env:
+        env['remote_working_dir'] = remote_working_dir
         yield
 
 def _ssh_client(**kwargs):
@@ -240,11 +253,14 @@ def remote(command, **kwargs):
         'combine_stderr': True,
         'quiet': False,
         'discard_output': False,
+        'remote_working_dir': None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
     
     # wrap the command up
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
+    if final_kwargs['remote_working_dir']:
+        command = pwd_wrap_command(command, final_kwargs['remote_working_dir'])
     if final_kwargs['use_shell']:
         command = shell_wrap_command(command)
     if final_kwargs['use_sudo']:

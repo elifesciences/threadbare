@@ -1,7 +1,7 @@
 import os
 from threadbare import state
 from threadbare.state import settings
-from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd
+from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd, rcd
 
 def nest_some_settings():
     "demonstrates how settings accumulate"
@@ -21,11 +21,15 @@ def run_a_local_command_with_separate_streams():
 def run_a_local_command_in_a_different_dir():
     "switch to a different local directory to run a command"
     with lcd("/tmp"):
-        print(local("echo $(pwd)", capture=True))
+        print(local("pwd", capture=True))
 
 def run_a_remote_command():
     "run a simple remote command"
     print(remote(r'echo -e "\e[31mDanger Will Robinson!\e[0m"'))
+
+def run_a_remote_command_in_a_different_dir():
+    with rcd("/tmp"):
+        print(remote("pwd"))
 
 def run_a_remote_command_as_root():
     print(remote_sudo("cd /root && echo tapdance in $(pwd)"))
@@ -162,6 +166,7 @@ def main():
     run_a_local_command_in_a_different_dir()
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
         run_a_remote_command()
+        run_a_remote_command_in_a_different_dir()
         run_a_remote_command_as_root()
         run_a_remote_command_with_separate_streams()
         run_a_remote_command_with_shell_interpolation()

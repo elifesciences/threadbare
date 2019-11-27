@@ -5,12 +5,29 @@ from threadbare import operations
 from threadbare.common import merge, cwd
 from pssh import exceptions as pssh_exceptions
 
-# simple remote calls
+# remote
 
 HOST = 'testhost'
 USER = 'testuser'
 PORT = 666
 PEM = "/home/testuser/.ssh/id_rsa"
+
+def test_rcd():
+    "`operations.rcd` causes the command to be executed to happen in a different directory"
+    with patch('threadbare.operations._execute') as mockobj:
+        with operations.rcd("/tmp"):
+            operations.remote('pwd', host_string=HOST, port=PORT, user=USER, key_filename=PEM)
+
+    expected_kwargs = {
+        'host_string': HOST,
+        'port': PORT,
+        'user': USER,
+        'key_filename': PEM,
+        
+        'use_pty': True,
+        'command': '/bin/bash -l -c "cd \\"/tmp\\" && pwd"'
+    }
+    mockobj.assert_called_with(**expected_kwargs)
 
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
@@ -126,7 +143,16 @@ def test_remote_command_timeout_exception():
         assert type(err.wrapped) == pssh_exceptions.Timeout
         assert str(err) == 'Timed out trying to connect. foobar'
 
-#
+# local
+
+def test_lcd():
+    "changes the local working directory"
+    cur_cwd = cwd()
+    new_cwd = '/tmp'
+    assert not cur_cwd.startswith(new_cwd) # sanity check
+    with operations.lcd(new_cwd):
+        assert cwd() == new_cwd
+    assert cwd() == cur_cwd
 
 def test_local_shell_command():
     "commands are run within a shell successfully"
@@ -230,12 +256,3 @@ def test_single_command():
     for given, expected in cases:
         actual = operations.single_command(given)
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
-
-def test_lcd():
-    "changes the local working directory"
-    cur_cwd = cwd()
-    new_cwd = '/tmp'
-    assert not cur_cwd.startswith(new_cwd) # sanity check
-    with operations.lcd(new_cwd):
-        assert cwd() == new_cwd
-    assert cwd() == cur_cwd
