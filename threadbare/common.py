@@ -1,3 +1,4 @@
+import os
 from functools import reduce
 
 def first(x):
@@ -31,3 +32,7 @@ def rename(d, pair_list):
         if old in d:
             d[new] = d[old]
             del d[old]
+
+def cwd():
+    "returns the resolved path to the Current Working Dir (cwd)"
+    return os.path.realpath(os.curdir)

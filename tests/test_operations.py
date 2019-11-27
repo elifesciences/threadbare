@@ -2,15 +2,32 @@ import pytest
 import unittest.mock as mock
 from unittest.mock import patch
 from threadbare import operations
-from threadbare.common import merge
+from threadbare.common import merge, cwd
 from pssh import exceptions as pssh_exceptions
 
-# simple remote calls
+# remote
 
 HOST = 'testhost'
 USER = 'testuser'
 PORT = 666
 PEM = "/home/testuser/.ssh/id_rsa"
+
+def test_rcd():
+    "`operations.rcd` causes the command to be executed to happen in a different directory"
+    with patch('threadbare.operations._execute') as mockobj:
+        with operations.rcd("/tmp"):
+            operations.remote('pwd', host_string=HOST, port=PORT, user=USER, key_filename=PEM)
+
+    expected_kwargs = {
+        'host_string': HOST,
+        'port': PORT,
+        'user': USER,
+        'key_filename': PEM,
+        
+        'use_pty': True,
+        'command': '/bin/bash -l -c "cd \\"/tmp\\" && pwd"'
+    }
+    mockobj.assert_called_with(**expected_kwargs)
 
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
@@ -73,11 +90,15 @@ def test_remote_non_default_args():
         # shell, sudo command
         [{'use_shell': True, 'use_sudo': True},  {'use_pty': True, 'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'}],
 
-        # shell escoperationsng
+        # shell escaped operations
         [{'command': 'foo=bar; echo "bar? $foo!"'},  {'use_pty': True, 'command': '/bin/bash -l -c "foo=bar; echo \\"bar? \\$foo!\\""'}],
 
-        # shell escoperationsng, non-shell
+        # shell escaped operations, non-shell
         [{'command': 'foo=bar; echo "bar? $foo!"', 'use_shell': False},  {'use_pty': True, 'command': 'foo=bar; echo "bar? $foo!"'}],
+
+        # specific directory
+        [{'remote_working_dir': '/tmp', 'command': 'pwd', 'use_shell': False},  {'use_pty': True, 'command': 'cd "/tmp" && pwd'}],
+        [{'remote_working_dir': '/tmp', 'command': 'pwd', 'use_shell': True},  {'use_pty': True, 'command': '/bin/bash -l -c "cd \\"/tmp\\" && pwd"'}],
         
         # edge cases
 
@@ -126,7 +147,16 @@ def test_remote_command_timeout_exception():
         assert type(err.wrapped) == pssh_exceptions.Timeout
         assert str(err) == 'Timed out trying to connect. foobar'
 
-#
+# local
+
+def test_lcd():
+    "changes the local working directory"
+    cur_cwd = cwd()
+    new_cwd = '/tmp'
+    assert not cur_cwd.startswith(new_cwd) # sanity check
+    with operations.lcd(new_cwd):
+        assert cwd() == new_cwd
+    assert cwd() == cur_cwd
 
 def test_local_shell_command():
     "commands are run within a shell successfully"
@@ -218,6 +248,7 @@ def test_local_command_split_stderr():
     assert expected == actual
 
 def test_single_command():
+    "joins multiple commands into a single command to be run"
     cases = [
         [None, None],
         [[], None],
