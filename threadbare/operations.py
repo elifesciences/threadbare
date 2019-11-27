@@ -395,7 +395,23 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
         return local_path
 
 def _upload_as_root_hack(local_path, remote_path, **kwargs):
-    pass
+    """uploads file at `local_path` to a remote temporary file then moves the file to `remote_path` as root
+    does not alter any permissions or attributes on the file"""
+
+    client = _ssh_client(**kwargs)
+
+    cmd = single_command([
+        # create a temporary file with the suffix '-threadbare'
+        'tempfile=$(mktemp --suffix "-threadbare")',
+        'echo "$tempfile"'
+    ])
+    result = remote(cmd)
+    remote_temp_path = result['stdout'][-1]
+    assert remote_file_exists(remote_temp_path, **kwargs) # sanity check
+
+    client.copy_file(local_path, remote_temp_path)
+    remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path))
+    assert remote_file_exists(remote_path, use_sudo=True)
 
 def upload(local_path, remote_path, use_sudo=False, **kwargs):
     # what does use_sudo mean in this context?
@@ -403,17 +419,19 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
     # "upload as root?"
     # former
 
-    if use_sudo:
-        return _upload_as_root_hack(local_path, remote_path, **kwargs)
+    with state.settings(quiet=True):
+        if use_sudo:
+            return _upload_as_root_hack(local_path, remote_path, **kwargs)
 
-    if not os.path.exists(local_path):
-        raise EnvironmentError("local file does not exist: %s" % (local_path,))
-    # you're not crazy, sftp is *exceptionally* slow:
-    # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-    #local('du -sh %s' % local_path)
-    client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
-    #print('client',client)
-    client.copy_file(local_path, remote_path)
-    #client.pool.join()
-    #print('done')
-    #client.disconnect()
+        if not os.path.exists(local_path):
+            raise EnvironmentError("local file does not exist: %s" % (local_path,))
+
+        # you're not crazy, sftp is *exceptionally* slow:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        #local('du -sh %s' % local_path)
+        client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+        #print('client',client)
+        client.copy_file(local_path, remote_path)
+        #client.pool.join()
+        #print('done')
+        #client.disconnect()

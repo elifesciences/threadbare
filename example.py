@@ -123,7 +123,19 @@ def download_file_owned_by_root():
     remote_sudo('rm -f "%s"' % remote_file_name)
     
     print('done!')
-    
+
+def upload_file_to_root_dir():
+
+    remote_file_name = "/root/threadbare-test.temp"
+    remote_sudo('rm -f "%s"' % remote_file_name)
+    assert not remote_file_exists(remote_file_name, use_sudo=True)
+
+    local_file_name = "/tmp/threadbare-test.temp"
+    local('echo foobarbaz > "%s"' % local_file_name)
+    upload(local_file_name, remote_file_name, use_sudo=True)
+
+    assert remote_file_exists(remote_file_name, use_sudo=True)
+
 def main():
     #nest_some_settings()
     #run_a_local_command()
@@ -132,7 +144,8 @@ def main():
         #run_a_remote_command_as_root()
         #run_many_remote_commands()
         #composite_actions()
-        download_file_owned_by_root()
+        #download_file_owned_by_root()
+        upload_file_to_root_dir()
         
 if __name__ == '__main__':
     main()
