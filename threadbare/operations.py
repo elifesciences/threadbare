@@ -295,8 +295,13 @@ def remote_file_exists(path, **kwargs):
     # $ echo $foo
     # /usr/*/share
 
+    base_kwargs = {
+        'use_sudo': False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    remote_fn = remote_sudo if final_kwargs['use_sudo'] else remote
     command = "test -e %s" % path
-    return remote(command, **kwargs)['return_code'] == 0
+    return remote_fn(command, **kwargs)['return_code'] == 0
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
 def local(command, **kwargs):
@@ -349,7 +354,7 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
     don't try to download anything huge `with_sudo`
     this file that requires root privileges will be available on the system in /tmp until the download is complete"""
     
-    if not remote_file_exists(remote_path, **kwargs):
+    if not remote_file_exists(remote_path, use_sudo=True, **kwargs):
         raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
     client = _ssh_client(**kwargs)
 
@@ -357,15 +362,15 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
         # create a temporary file with the suffix '-threadbare'
         'tempfile=$(mktemp --suffix "-threadbare")',
         # copy the target file to this temporary file
-        'cp "%s" "/tmp/$tempfile"' % remote_path,
+        'cp "%s" "$tempfile"' % remote_path,
         # ensure it's readable by the user doing the downloading
-        'chown +r "$tempfile"',
+        'chmod +r "$tempfile"',
         # emit the name of the temporary file so we can find it to download it
         'echo "$tempfile"'
     ])
     result = remote_sudo(cmd)
     remote_tempfile=result['stdout'][-1]
-    assert remote_file_exists(remote_tempfile) # sanity check
+    assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
     remote_path = remote_tempfile
     client.copy_remote_file(remote_tempfile, local_path)
     remote_sudo('rm "%s"' % remote_tempfile)
@@ -377,15 +382,17 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
     """downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
     avoid `use_sudo` if at all possible"""
 
-    if use_sudo:
-        return _download_as_root_hack(remote_path, local_path, **kwargs)
+    # ensure the output of any remote commands gets hidden
+    with state.settings(quiet=True):
+        if use_sudo:
+            return _download_as_root_hack(remote_path, local_path, **kwargs)
     
-    if not remote_file_exists(remote_path, **kwargs):
-        raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+        if not remote_file_exists(remote_path, **kwargs):
+            raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
 
-    client = _ssh_client(**kwargs)
-    client.copy_remote_file(remote_path, local_path)
-    return local_path
+        client = _ssh_client(**kwargs)
+        client.copy_remote_file(remote_path, local_path)
+        return local_path
 
 def _upload_as_root_hack(local_path, remote_path, **kwargs):
     pass

@@ -1,6 +1,7 @@
+import os
 from threadbare import state
 from threadbare.state import settings
-from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload
+from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command
 
 def handle_result(result):
     env = state.ENV # or, `with settings() as env` works just as well
@@ -90,14 +91,48 @@ def composite_actions():
 
     print('good!')
 
+def download_file_owned_by_root():
+    print('creating a root-only file on remote machine ...')
+    remote_file_name = "/root/threadbare-test.temp"
+    file_contents = "root users only!\n"
+    remote_sudo(single_command([
+        'printf "%s" > "%s"' % (file_contents, remote_file_name),
+        'chmod 600 "%s"' % remote_file_name
+    ]))
+
+    print("ensuring local file doesn't exist ...")
+    local_file_name = "/tmp/threadbare-test.temp"
+    local('rm -f "%s"' % local_file_name)
+
+    print('ensuring remote root-only file cannot be seen or downloaded by regular user %r' % state.ENV['user'])
+    try:
+        download(remote_file_name, local_file_name)
+        assert False, "remote file shouldn't be detectable!"
+    except EnvironmentError:
+        # file undetectable by regular user!
+        pass
+
+    print('downloading remote root-only file as regular user %r' % state.ENV['user'])
+    download(remote_file_name, local_file_name, use_sudo=True)
+    print('testing')
+    assert os.path.exists(local_file_name)
+    print('ensuring contents match ...')
+    assert open(local_file_name, 'r').read() == file_contents
+
+    print('removing remote root-only file')
+    remote_sudo('rm -f "%s"' % remote_file_name)
+    
+    print('done!')
+    
 def main():
-    nest_some_settings()
-    run_a_local_command()
+    #nest_some_settings()
+    #run_a_local_command()
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        run_a_remote_command()
-        run_a_remote_command_as_root()
-        run_many_remote_commands()
-        composite_actions()
+        #run_a_remote_command()
+        #run_a_remote_command_as_root()
+        #run_many_remote_commands()
+        #composite_actions()
+        download_file_owned_by_root()
         
 if __name__ == '__main__':
     main()
