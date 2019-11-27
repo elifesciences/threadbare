@@ -295,8 +295,13 @@ def remote_file_exists(path, **kwargs):
     # $ echo $foo
     # /usr/*/share
 
+    base_kwargs = {
+        'use_sudo': False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    remote_fn = remote_sudo if final_kwargs['use_sudo'] else remote
     command = "test -e %s" % path
-    return remote(command, **kwargs)['return_code'] == 0
+    return remote_fn(command, **kwargs)['return_code'] == 0
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
 def local(command, **kwargs):
@@ -337,23 +342,96 @@ def local(command, **kwargs):
         'stderr': (stderr or b'').decode('utf-8').splitlines(),
     }
 
+def single_command(cmd_list):
+    """given a list of commands to run, returns a single command
+    `remote` and `local` are expected to do any escaping as necessary"""
+    if cmd_list in [None, []]:
+        return None
+    return ' && '.join(map(str, cmd_list))
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
 # use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
-def download(remote_path, local_path, **kwargs):
-    if not remote_file_exists(remote_path):
+def _download_as_root_hack(remote_path, local_path, **kwargs):
+    """as root, creates a temporary copy of the file that can be downloaded by a 
+    regular user and then removes the temporary file.
+    warning: don't try to download anything huge `with_sudo` as the file is duplicated.
+    warning: the privileged file will be available in /tmp until the download is complete"""
+    
+    if not remote_file_exists(remote_path, use_sudo=True, **kwargs):
         raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
     client = _ssh_client(**kwargs)
-    client.copy_remote_file(remote_path, local_path)
 
-def upload(local_path, remote_path, **kwargs):
-    if not os.path.exists(local_path):
-        raise EnvironmentError("local file does not exist: %s" % (local_path,))
-    # you're not crazy, sftp is *exceptionally* slow:
-    # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-    #local('du -sh %s' % local_path)
-    client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
-    #print('client',client)
-    client.copy_file(local_path, remote_path)
-    #client.pool.join()
-    #print('done')
-    #client.disconnect()
+    cmd = single_command([
+        # create a temporary file with the suffix '-threadbare'
+        'tempfile=$(mktemp --suffix "-threadbare")',
+        # copy the target file to this temporary file
+        'cp "%s" "$tempfile"' % remote_path,
+        # ensure it's readable by the user doing the downloading
+        'chmod +r "$tempfile"',
+        # emit the name of the temporary file so we can find it to download it
+        'echo "$tempfile"'
+    ])
+    result = remote_sudo(cmd)
+    remote_tempfile=result['stdout'][-1]
+    #assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
+    remote_path = remote_tempfile
+    client.copy_remote_file(remote_tempfile, local_path)
+    remote_sudo('rm "%s"' % remote_tempfile)
+    return local_path
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
+# use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
+def download(remote_path, local_path, use_sudo=False, **kwargs):
+    """downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
+    avoid `use_sudo` if at all possible"""
+
+    # ensure the output of any remote commands gets hidden
+    with state.settings(quiet=True):
+        if use_sudo:
+            return _download_as_root_hack(remote_path, local_path, **kwargs)
+    
+        if not remote_file_exists(remote_path, **kwargs):
+            raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+
+        client = _ssh_client(**kwargs)
+        client.copy_remote_file(remote_path, local_path)
+        return local_path
+
+def _upload_as_root_hack(local_path, remote_path, **kwargs):
+    """uploads file at `local_path` to a remote temporary file then moves the file to `remote_path` as root.
+    does not alter any permissions or attributes on the file"""
+
+    client = _ssh_client(**kwargs)
+
+    cmd = single_command([
+        # create a temporary file with the suffix '-threadbare'
+        'tempfile=$(mktemp --suffix "-threadbare")',
+        'echo "$tempfile"'
+    ])
+    result = remote(cmd)
+    remote_temp_path = result['stdout'][-1]
+    assert remote_file_exists(remote_temp_path, **kwargs) # sanity check
+
+    client.copy_file(local_path, remote_temp_path)
+    remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path))
+    assert remote_file_exists(remote_path, use_sudo=True)
+
+def upload(local_path, remote_path, use_sudo=False, **kwargs):
+    "uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path"
+    with state.settings(quiet=True):
+        if use_sudo:
+            return _upload_as_root_hack(local_path, remote_path, **kwargs)
+
+        if not os.path.exists(local_path):
+            raise EnvironmentError("local file does not exist: %s" % (local_path,))
+
+        # you're not crazy, sftp is *exceptionally* slow:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        #local('du -sh %s' % local_path)
+        #client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+        client = _ssh_client(**kwargs)
+        #print('client',client)
+        client.copy_file(local_path, remote_path)
+        #client.pool.join()
+        #print('done')
+        #client.disconnect()
