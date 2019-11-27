@@ -1,6 +1,11 @@
 import pytest
-import unittest.mock as mock
-from unittest.mock import patch
+try:
+    import unittest.mock as mock
+    from unittest.mock import patch
+except ImportError:
+    import mock
+    from mock import patch
+
 from threadbare import operations
 from threadbare.common import merge, cwd
 from pssh import exceptions as pssh_exceptions

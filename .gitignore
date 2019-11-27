@@ -4,3 +4,4 @@
 *.log
 venv/
 threadbare.egg-info/
+.tox/
