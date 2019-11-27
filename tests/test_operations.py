@@ -2,7 +2,7 @@ import pytest
 import unittest.mock as mock
 from unittest.mock import patch
 from threadbare import operations
-from threadbare.common import merge
+from threadbare.common import merge, cwd
 from pssh import exceptions as pssh_exceptions
 
 # simple remote calls
@@ -218,6 +218,7 @@ def test_local_command_split_stderr():
     assert expected == actual
 
 def test_single_command():
+    "joins multiple commands into a single command to be run"
     cases = [
         [None, None],
         [[], None],
@@ -229,3 +230,12 @@ def test_single_command():
     for given, expected in cases:
         actual = operations.single_command(given)
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
+
+def test_lcd():
+    "changes the local working directory"
+    cur_cwd = cwd()
+    new_cwd = '/tmp'
+    assert not cur_cwd.startswith(new_cwd) # sanity check
+    with operations.lcd(new_cwd):
+        assert cwd() == new_cwd
+    assert cwd() == cur_cwd

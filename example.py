@@ -1,7 +1,7 @@
 import os
 from threadbare import state
 from threadbare.state import settings
-from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command
+from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd
 
 def nest_some_settings():
     "demonstrates how settings accumulate"
@@ -17,6 +17,11 @@ def run_a_local_command():
 def run_a_local_command_with_separate_streams():
     "run a simple local command but capture the output"
     print(local("echo hello, world!", capture=True))
+
+def run_a_local_command_in_a_different_dir():
+    "switch to a different local directory to run a command"
+    with lcd("/tmp"):
+        print(local("echo $(pwd)", capture=True))
 
 def run_a_remote_command():
     "run a simple remote command"
@@ -154,6 +159,7 @@ def main():
     nest_some_settings()
     run_a_local_command()
     run_a_local_command_with_separate_streams()
+    run_a_local_command_in_a_different_dir()
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
         run_a_remote_command()
         run_a_remote_command_as_root()

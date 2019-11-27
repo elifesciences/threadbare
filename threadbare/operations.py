@@ -1,10 +1,11 @@
+import contextlib
 import subprocess
 import getpass
 from pssh.clients.native import SSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
-from threadbare.common import merge, subdict, rename
+from threadbare.common import merge, subdict, rename, cwd
 
 class SSHClient(PSSHClient):
     # do not copy.deepcopy the pssh SSHClient object, just
@@ -96,6 +97,16 @@ def handle(base_kwargs, kwargs):
     return global_kwargs, user_kwargs, final_kwargs
 
 # api
+
+@contextlib.contextmanager
+def lcd(local_dir):
+    "temporarily changes the local working directory"
+    assert os.path.isdir(local_dir), "not a directory: %s" % local_dir
+    with state.settings():
+        current_dir = cwd()
+        state.add_cleanup(lambda: os.chdir(current_dir))
+        os.chdir(local_dir)
+        yield
 
 def _ssh_client(**kwargs):
     """returns an instance of pssh.clients.native.SSHClient
