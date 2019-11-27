@@ -1,3 +1,5 @@
+# TODO for 0.1.0 release
+
 - [x] implement `local`
 - [x] capture stdout + stderr (local)
 - [x] `remote`
@@ -13,8 +15,14 @@
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
+- [ ] move taskrunner from builder into threadbare, including tests
+- [ ] separate development dependencies from required ones
+- [ ] test automation
+- [ ] python 2 tests
+- [ ] python 3 tests
+- [ ] integrate with builder and fix any inconsistencies
 
-investigate:
+## investigate:
 
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
@@ -34,7 +42,7 @@ investigate:
     - because Fabric and pssh totally support that.
         - they're both using SFTP under the hood
 
-ignored:
+## wontfix:
 
 * implement `disconnect_all` that closes all open client connections
     - client connections are closed automatically when the context is left
