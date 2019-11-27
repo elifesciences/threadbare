@@ -90,11 +90,15 @@ def test_remote_non_default_args():
         # shell, sudo command
         [{'use_shell': True, 'use_sudo': True},  {'use_pty': True, 'command': 'sudo --non-interactive /bin/bash -l -c "echo hello"'}],
 
-        # shell escoperationsng
+        # shell escaped operations
         [{'command': 'foo=bar; echo "bar? $foo!"'},  {'use_pty': True, 'command': '/bin/bash -l -c "foo=bar; echo \\"bar? \\$foo!\\""'}],
 
-        # shell escoperationsng, non-shell
+        # shell escaped operations, non-shell
         [{'command': 'foo=bar; echo "bar? $foo!"', 'use_shell': False},  {'use_pty': True, 'command': 'foo=bar; echo "bar? $foo!"'}],
+
+        # specific directory
+        [{'remote_working_dir': '/tmp', 'command': 'pwd', 'use_shell': False},  {'use_pty': True, 'command': 'cd "/tmp" && pwd'}],
+        [{'remote_working_dir': '/tmp', 'command': 'pwd', 'use_shell': True},  {'use_pty': True, 'command': '/bin/bash -l -c "cd \\"/tmp\\" && pwd"'}],
         
         # edge cases
 
