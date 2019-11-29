@@ -1,3 +1,4 @@
+import tempfile
 import contextlib
 import subprocess
 import getpass
@@ -414,6 +415,20 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
 
     # ensure the output of any remote commands gets hidden
     with state.settings(quiet=True):
+
+        
+        temp_file, bytes_buffer = None, None
+        if hasattr(local_path, 'read'):
+            # file-like object to download file into
+            # what we do is write the remote file to local temporary file
+            # then read that temporary data into the given buffer
+
+            bytes_buffer = local_path
+            temp_file, local_path = tempfile.mkstemp(suffix="-threadbare")
+            #with os.fdopen(temp_file, 'wb') as fh:
+            #    fh.write(local_bytes.getvalue())
+            #cleanup = lambda: os.unlink(local_path)
+        
         if use_sudo:
             return _download_as_root_hack(remote_path, local_path, **kwargs)
     
@@ -422,6 +437,11 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
 
         client = _ssh_client(**kwargs)
         client.copy_remote_file(remote_path, local_path)
+
+        if temp_file:
+            bytes_buffer.write(open(local_path, 'rb').read())
+            return bytes_buffer
+
         return local_path
 
 def _upload_as_root_hack(local_path, remote_path, **kwargs):
@@ -443,9 +463,26 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
     remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path))
     assert remote_file_exists(remote_path, use_sudo=True)
 
+def write_bytes_to_temporary_file(local_path):
+    if hasattr(local_path, 'read'):
+        # `local_path` is a file-like object
+        local_bytes = local_path
+        local_bytes.seek(0) # reset internal pointer
+        temp_file, local_path = tempfile.mkstemp(suffix="-threadbare")
+        with os.fdopen(temp_file, 'wb') as fh:
+            fh.write(local_bytes.getvalue())
+        cleanup = lambda: os.unlink(local_path)
+        return local_path, cleanup
+    return local_path, None
+
 def upload(local_path, remote_path, use_sudo=False, **kwargs):
     "uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path"
     with state.settings(quiet=True):
+        
+        local_path, cleanup_fn = write_bytes_to_temporary_file(local_path)
+        if cleanup_fn:
+            state.add_cleanup(cleanup_fn)
+        
         if use_sudo:
             return _upload_as_root_hack(local_path, remote_path, **kwargs)
 

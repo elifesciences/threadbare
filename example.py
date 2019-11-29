@@ -1,4 +1,5 @@
 import os
+from io import BytesIO
 from threadbare import state
 from threadbare.state import settings
 from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd, rcd
@@ -159,12 +160,21 @@ def upload_file_to_root_dir():
 
     assert remote_file_exists(remote_file_name, use_sudo=True)
 
+def upload_bytes_to_a_file():
+    unicode_buffer = BytesIO(b"foobarbaz")
+    remote_file_name = '/tmp/threadbare-bytes-test.temp'
+    print(upload(unicode_buffer, remote_file_name))
+    print(remote('cat "%s"' % remote_file_name))
+    
 def main():
+    '''
     nest_some_settings()
     run_a_local_command()
     run_a_local_command_with_separate_streams()
     run_a_local_command_in_a_different_dir()
+    '''
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        '''
         run_a_remote_command()
         run_a_remote_command_in_a_different_dir()
         run_a_remote_command_as_root()
@@ -176,10 +186,13 @@ def main():
         run_many_remote_commands_serially()
         run_many_remote_commands_in_parallel()
 
+        upload_and_download_a_file()
         upload_file_to_root_dir()
         download_file_owned_by_root()
+        '''
 
-        upload_and_download_a_file()
+        upload_bytes_to_a_file()
+
         
 if __name__ == '__main__':
     main()
