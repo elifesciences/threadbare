@@ -417,21 +417,23 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
         
         temp_file, bytes_buffer = None, None
         if hasattr(local_path, 'read'):
-            # file-like object to download file into
-            # what we do is write the remote file to local temporary file
-            # then read that temporary data into the given buffer and delete the file
+            # given a file-like object to download file into.
+            # 1. write the remote file to local temporary file
+            # 2. read temporary file into the given buffer
+            # 3. delete the temporary file
 
             bytes_buffer = local_path
             temp_file, local_path = tempfile.mkstemp(suffix="-threadbare")
         
         if use_sudo:
-            return _download_as_root_hack(remote_path, local_path, **kwargs)
-    
-        if not remote_file_exists(remote_path, **kwargs):
-            raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+            #return _download_as_root_hack(remote_path, local_path, **kwargs)
+            local_path = _download_as_root_hack(remote_path, local_path, **kwargs)
 
-        client = _ssh_client(**kwargs)
-        client.copy_remote_file(remote_path, local_path)
+        else:
+            if not remote_file_exists(remote_path, **kwargs):
+                raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
+            client = _ssh_client(**kwargs)
+            client.copy_remote_file(remote_path, local_path)
 
         if temp_file:
             bytes_buffer.write(open(local_path, 'rb').read())
@@ -456,10 +458,13 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
     assert remote_file_exists(remote_temp_path, **kwargs) # sanity check
 
     client.copy_file(local_path, remote_temp_path)
-    remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path), **kwargs)
+    move_file_into_place = 'mv "%s" "%s"' % (remote_temp_path, remote_path)
+    remote_sudo(move_file_into_place, **kwargs)
     assert remote_file_exists(remote_path, use_sudo=True, **kwargs)
 
-def write_bytes_to_temporary_file(local_path):
+def _write_bytes_to_temporary_file(local_path):
+    """if `local_path` is a file-like object, write the contents to an *actual* file and 
+    return a pair of new local filename and a function that removes the temporary file when called."""
     if hasattr(local_path, 'read'):
         # `local_path` is a file-like object
         local_bytes = local_path
@@ -475,7 +480,7 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
     "uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path"
     with state.settings(quiet=True):
         
-        local_path, cleanup_fn = write_bytes_to_temporary_file(local_path)
+        local_path, cleanup_fn = _write_bytes_to_temporary_file(local_path)
         if cleanup_fn:
             state.add_cleanup(cleanup_fn)
         

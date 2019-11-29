@@ -179,14 +179,11 @@ def upload_and_download_a_file_using_bytes():
         download_file_to_local_bytes(remote_file_name)
 
 def main():
-    '''
     nest_some_settings()
     run_a_local_command()
     run_a_local_command_with_separate_streams()
     run_a_local_command_in_a_different_dir()
-    '''
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        '''
         run_a_remote_command()
         run_a_remote_command_in_a_different_dir()
         run_a_remote_command_as_root()
@@ -201,9 +198,7 @@ def main():
         upload_and_download_a_file()
         upload_file_to_root_dir()
         download_file_owned_by_root()
-        '''
 
-        upload_and_download_a_file_using_bytes()
 
 if __name__ == '__main__':
     main()
