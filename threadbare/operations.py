@@ -2,7 +2,7 @@ import tempfile
 import contextlib
 import subprocess
 import getpass
-from pssh.clients.native import SSHClient as PSSHClient
+from pssh.clients.native.parallel import ParallelSSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
@@ -134,10 +134,14 @@ def _ssh_client(**kwargs):
         'host_string': None,
         'key_filename': os.path.expanduser("~/.ssh/id_rsa"),
         'port': 22,
+        'timeout': 10,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
     final_kwargs['password'] = None # always private keys
     rename(final_kwargs, [('key_filename', 'pkey'), ('host_string', 'host')])
+
+    final_kwargs['hosts'] = [final_kwargs['host']]
+    del final_kwargs['host']
 
     # if we're not using global state, return the new client as-is
     env = state.ENV
@@ -145,7 +149,8 @@ def _ssh_client(**kwargs):
         return SSHClient(**final_kwargs)
 
     client_map_key = "ssh_client"
-    client_key = tuple(sorted(final_kwargs.items()))
+    client_key = subdict(final_kwargs, ['user', 'host', 'pkey', 'port', 'timeout'])
+    client_key = tuple(sorted(client_key.items()))
     
     # otherwise, check to see if a previous client is available
     client_map = env.get(client_map_key, {})
@@ -156,9 +161,6 @@ def _ssh_client(**kwargs):
 
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
     client = SSHClient(**final_kwargs)
-
-    # disconnect session when leaving context manager
-    state.add_cleanup(lambda: client.disconnect())
 
     client_map[client_key] = client
     env[client_map_key] = client_map
@@ -181,17 +183,21 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
     encoding = 'utf-8' # default everywhere
 
     try:
-        channel, host_string, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
+        greenlet_timeout = timeout
+        host_args = None
+        stop_on_errors = True
 
-        def get_exitcode():
-            """we can't know the exit code until command has finished running but we *can* access
-            the output streams. attempting to realise the exitcode will cause the thread of execution 
-            to block until the channel is finished"""
-            client.wait_finished(channel) # `timeout` here
-            return channel.get_exit_status()
+        result = client.run_command(command, sudo, user, stop_on_errors, use_pty,  host_args, shell, encoding, timeout, greenlet_timeout)
+        #channel = result[host_string]['channel']
+        stdout = result[host_string]['stdout']
+        stderr = result[host_string]['stderr']
+
+        def wait_for_return_codes():
+            client.join(result)
+            return result[host_string]['exit_code']
 
         return {
-            'return_code': get_exitcode,
+            'return_code': wait_for_return_codes,
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
@@ -329,7 +335,8 @@ def remote_file_exists(path, **kwargs):
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
     remote_fn = remote_sudo if final_kwargs['use_sudo'] else remote
     command = "test -e %s" % path
-    return remote_fn(command, **kwargs)['return_code'] == 0
+    result = remote_fn(command, **kwargs)
+    return result['return_code'] == 0
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
 def local(command, **kwargs):

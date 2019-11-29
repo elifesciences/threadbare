@@ -25,6 +25,7 @@
 - [ ] integrate with builder and fix any inconsistencies
 - [ ] convert example.py to a proper test suite
 - [ ] linting
+- [ ] coverage
 
 ## investigate:
 
