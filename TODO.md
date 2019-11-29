@@ -7,8 +7,10 @@
 - [x] implement remote_file_exists
 - [x] implement `put`/`upload`
 - [x] implement `put`/`upload` 'use_sudo' hack
+- [x] implement `put`/`upload` from bytes buffer
 - [x] implement `get`/`download`
 - [x] implement `get`/`download` 'use_sudo' hack
+- [x] implement `get`/`download` to bytes buffer
 - [x] implement `lcd`
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
@@ -21,8 +23,13 @@
 - [ ] python 2 tests
 - [ ] python 3 tests
 - [ ] integrate with builder and fix any inconsistencies
+- [ ] convert example.py to a proper test suite
+- [ ] linting
 
 ## investigate:
+
+* `remote_file_exists` needs it's behaviour checked against what Fabric is doing
+    - it's causing bootstrap to fail/hang while polling for remote files
 
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
