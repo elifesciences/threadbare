@@ -399,12 +399,12 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
         # emit the name of the temporary file so we can find it to download it
         'echo "$tempfile"'
     ])
-    result = remote_sudo(cmd)
+    result = remote_sudo(cmd, **kwargs)
     remote_tempfile=result['stdout'][-1]
     #assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
     remote_path = remote_tempfile
     client.copy_remote_file(remote_tempfile, local_path)
-    remote_sudo('rm "%s"' % remote_tempfile)
+    remote_sudo('rm "%s"' % remote_tempfile, **kwargs)
     return local_path
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
@@ -455,13 +455,13 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
         'tempfile=$(mktemp --suffix "-threadbare")',
         'echo "$tempfile"'
     ])
-    result = remote(cmd)
+    result = remote(cmd, **kwargs)
     remote_temp_path = result['stdout'][-1]
     assert remote_file_exists(remote_temp_path, **kwargs) # sanity check
 
     client.copy_file(local_path, remote_temp_path)
-    remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path))
-    assert remote_file_exists(remote_path, use_sudo=True)
+    remote_sudo('mv "%s" "%s"' % (remote_temp_path, remote_path), **kwargs)
+    assert remote_file_exists(remote_path, use_sudo=True, **kwargs)
 
 def write_bytes_to_temporary_file(local_path):
     if hasattr(local_path, 'read'):

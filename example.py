@@ -160,12 +160,24 @@ def upload_file_to_root_dir():
 
     assert remote_file_exists(remote_file_name, use_sudo=True)
 
-def upload_bytes_to_a_file():
+def upload_bytes_to_remote_file():
     unicode_buffer = BytesIO(b"foobarbaz")
     remote_file_name = '/tmp/threadbare-bytes-test.temp'
-    print(upload(unicode_buffer, remote_file_name))
+    upload(unicode_buffer, remote_file_name)
     print(remote('cat "%s"' % remote_file_name))
-    
+    return remote_file_name
+
+def download_file_to_local_bytes(remote_file_name):
+    assert remote_file_exists(remote_file_name)
+    unicode_buffer = BytesIO()
+    download(remote_file_name, unicode_buffer)
+    print(unicode_buffer.getvalue())
+
+def upload_and_download_a_file_using_bytes():
+    with settings(quiet=True):
+        remote_file_name = upload_bytes_to_remote_file()
+        download_file_to_local_bytes(remote_file_name)
+
 def main():
     '''
     nest_some_settings()
@@ -191,8 +203,7 @@ def main():
         download_file_owned_by_root()
         '''
 
-        upload_bytes_to_a_file()
+        upload_and_download_a_file_using_bytes()
 
-        
 if __name__ == '__main__':
     main()
