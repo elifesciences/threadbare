@@ -413,21 +413,16 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
     """downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
     avoid `use_sudo` if at all possible"""
 
-    # ensure the output of any remote commands gets hidden
     with state.settings(quiet=True):
-
         
         temp_file, bytes_buffer = None, None
         if hasattr(local_path, 'read'):
             # file-like object to download file into
             # what we do is write the remote file to local temporary file
-            # then read that temporary data into the given buffer
+            # then read that temporary data into the given buffer and delete the file
 
             bytes_buffer = local_path
             temp_file, local_path = tempfile.mkstemp(suffix="-threadbare")
-            #with os.fdopen(temp_file, 'wb') as fh:
-            #    fh.write(local_bytes.getvalue())
-            #cleanup = lambda: os.unlink(local_path)
         
         if use_sudo:
             return _download_as_root_hack(remote_path, local_path, **kwargs)
@@ -440,6 +435,7 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
 
         if temp_file:
             bytes_buffer.write(open(local_path, 'rb').read())
+            os.unlink(local_path)
             return bytes_buffer
 
         return local_path
