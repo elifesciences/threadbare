@@ -8,6 +8,15 @@ from threadbare import state
 from threadbare.common import merge, subdict, rename, cwd, sudo_wrap_command, pwd_wrap_command, shell_wrap_command
 import pssh.clients.native
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+# gevent is used by Parallel-SSH which interferes with Python multiprocessing
+# it causes 'things' to block indefinitely
+from gevent import monkey
+monkey.patch_all(thread=False)
+
 # socket handling (ssh) behaves differently inside a child process when using multiprocessing
 # pssh.native.parallel.SSHClient handles this well, but the function signatures and return values
 # and other behaviour changes, like downloading files to something other than what we told it to.
@@ -18,14 +27,18 @@ import pssh.clients.native
 class SSHClient(object):
     def __init__(self, **kwargs):
         self.parallel = state.ENV.get('parallel', False)
+        self.parallel = True
 
         if self.parallel:
+            print('creating parallel')
             host = kwargs.pop('host')
             self.host = host
             self.client = pssh.clients.native.parallel.ParallelSSHClient([host], **kwargs)
         else:
+
+            print('creating single')
             self.host = kwargs['host']
-            self.client = pssh.client.native.SSHClient(**kwargs)
+            self.client = pssh.clients.native.SSHClient(**kwargs)
 
     def run_command(self, command, user, use_pty):
 
@@ -36,10 +49,16 @@ class SSHClient(object):
 
         if self.parallel:
             stop_on_errors = True,
-            greenlet_timeout = None # = timeout ?
+            greenlet_timeout = 10 # seconds #None # = timeout ?
             host_args = None
+
+            print('running command against',self.host,self.client.host_clients)
+            
             result = self.client.run_command(command, sudo, user, stop_on_errors, use_pty,  host_args, shell, encoding, timeout, greenlet_timeout)
             self._last_result = result
+
+            self.client.join(result)
+            
             result = result[self.host]
             # result is a 'HostOutput' object
             # https://parallel-ssh.readthedocs.io/en/latest/output.html#pssh.output.HostOutput
@@ -50,15 +69,15 @@ class SSHClient(object):
         self._last_result = result
         return result
 
-    def copy_file(self, **kwargs):
+    def copy_file(self, local_path, remote_path):
         if self.parallel:
             raise NotImplementedError('copy_file')
-        return self.client.copy_file(**kwargs)
+        return self.client.copy_file(local_path, remote_path)
 
-    def copy_remote_file(self, **kwargs):
+    def copy_remote_file(self, remote_path, local_path):
         if self.parallel:
             raise NotImplementedError('copy_remote_file')
-        return self.client.copy_remote_file(**kwargs)
+        return self.client.copy_remote_file(remote_path, local_path)
 
     def get_exit_code(self):
         if self.parallel:
@@ -70,8 +89,13 @@ class SSHClient(object):
         return channel.get_exit_status()
 
     def disconnect(self):
+        print('disconnecting ...')
         if self.parallel:
-            raise NotImplementedError('disconnect')
+            print(self.client.host_clients)
+            if self.host in self.client.host_clients:
+                self.client.host_clients[self.host].disconnect()
+            return
+
         return self.client.disconnect()
 
     def __deepcopy__(self, memo):
@@ -154,19 +178,26 @@ def _ssh_client(**kwargs):
     # if we're not using global state, return the new client as-is
     env = state.ENV
     if env.read_only:
+        print('read-only, retrieving client')
         return SSHClient(**final_kwargs)
 
     client_map_key = "ssh_client"
-    client_key = tuple(sorted(final_kwargs.items()))
+    #client_key = tuple(sorted(final_kwargs.items()))
+    client_key = subdict(final_kwargs, ['user', 'host', 'pkey', 'port', 'timeout'])
+    client_key = tuple(sorted(client_key.items()))
     
     # otherwise, check to see if a previous client is available
     client_map = env.get(client_map_key, {})
     if client_key in client_map:
-        return client_map[client_key]
+        print('retrieving client')
+        result = client_map[client_key]
+        print('got result',result)
+        return result
 
     # if not, create a new one and store it in the state
 
     # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+    print('creating new client')
     client = SSHClient(**final_kwargs)
 
     # disconnect session when leaving context manager
@@ -185,7 +216,7 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
         channel, host_string, stdout, stderr, stdin = client.run_command(command, user, use_pty) #, encoding, timeout)
 
         return {
-            'return_code': client.get_exit_code,
+            'return_code': client.get_exit_code(),
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
@@ -286,7 +317,7 @@ def remote(command, **kwargs):
         'stderr': _process_output(sys.stderr, result['stderr'], **output_kwargs),
 
         # command must have finished before we have access to return code
-        'return_code': result['return_code'](), 
+        'return_code': result['return_code'] #(), 
     })
 
     return result

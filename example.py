@@ -206,9 +206,35 @@ def check_many_remote_files():
 
     print(execute.execute(state.ENV, workerfn, param_key='remote_file', param_values=remote_file_list))
 
-def main():
+
+def mix_match_ssh_clients():
+    # single client
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        check_many_remote_files()
+        run_a_remote_command() # works
+        check_many_remote_files() # doesn't 
+        run_a_remote_command() # works
+
+def mix_match_ssh_clients2():
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        check_many_remote_files() # works
+        run_a_remote_command() # works
+
+def mix_match_ssh_clients3():
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        print('--------1')
+        check_many_remote_files() # works
+        print('--------2')
+        run_a_remote_command() # works
+        print('--------3')
+        check_many_remote_files() # doesn't
+
+def mix_match_ssh_clients4():
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        check_many_remote_files() # works
+        check_many_remote_files() # works
+
+def main():
+    mix_match_ssh_clients3()
     return
     '''
     nest_some_settings()
