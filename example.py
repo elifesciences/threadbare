@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from threadbare import execute
 from threadbare import state
 from threadbare.state import settings
 from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd, rcd
@@ -160,14 +161,14 @@ def upload_file_to_root_dir():
 
     assert remote_file_exists(remote_file_name, use_sudo=True)
 
-def upload_bytes_to_remote_file():
+def _upload_bytes_to_remote_file():
     unicode_buffer = BytesIO(b"foobarbaz")
     remote_file_name = '/tmp/threadbare-bytes-test.temp'
     upload(unicode_buffer, remote_file_name)
     print(remote('cat "%s"' % remote_file_name))
     return remote_file_name
 
-def download_file_to_local_bytes(remote_file_name):
+def _download_file_to_local_bytes(remote_file_name):
     assert remote_file_exists(remote_file_name)
     unicode_buffer = BytesIO()
     download(remote_file_name, unicode_buffer)
@@ -175,10 +176,41 @@ def download_file_to_local_bytes(remote_file_name):
 
 def upload_and_download_a_file_using_bytes():
     with settings(quiet=True):
-        remote_file_name = upload_bytes_to_remote_file()
-        download_file_to_local_bytes(remote_file_name)
+        remote_file_name = _upload_bytes_to_remote_file()
+        _download_file_to_local_bytes(remote_file_name)
+
+def check_remote_files():
+    "check that remote files can be found (or not)"
+    file_that_exists = "/var/log/syslog"
+    file_that_does_not_exist = "/foo/bar"
+    assert remote_file_exists(file_that_exists)
+    assert not remote_file_exists(file_that_does_not_exist)
+
+def check_many_remote_files():
+    remote_file_list = [
+        '/var/log/syslog', # True, exists
+        '/foo/bar'         # False, doesn't exist
+    ]
+
+    @execute.parallel
+    def workerfn():
+        with state.settings() as env:
+            remote_file = env['remote_file']
+            print("looking for",remote_file)
+            print("I have the environment",env)
+            try:
+                return remote_file_exists(remote_file, use_sudo=True)
+            except BaseException:
+                import traceback
+                print(traceback.format_exc())
+
+    print(execute.execute(state.ENV, workerfn, param_key='remote_file', param_values=remote_file_list))
 
 def main():
+    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
+        check_many_remote_files()
+    return
+    '''
     nest_some_settings()
     run_a_local_command()
     run_a_local_command_with_separate_streams()
@@ -198,7 +230,8 @@ def main():
         upload_and_download_a_file()
         upload_file_to_root_dir()
         download_file_owned_by_root()
-
-
+        upload_and_download_a_file_using_bytes()
+        check_many_remote_files()
+    '''
 if __name__ == '__main__':
     main()

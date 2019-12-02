@@ -73,6 +73,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
         #if nth_val: # why was I doing this?
         #    new_env[param_key] = nth_val
         new_env[param_key] = nth_val
+        new_env['parallel'] = True
 
         # lets not set these until we need them:
         # new_env['parallel'] = True

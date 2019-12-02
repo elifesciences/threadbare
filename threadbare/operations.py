@@ -2,17 +2,82 @@ import tempfile
 import contextlib
 import subprocess
 import getpass
-from pssh.clients.native import SSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
-from threadbare.common import merge, subdict, rename, cwd
+from threadbare.common import merge, subdict, rename, cwd, sudo_wrap_command, pwd_wrap_command, shell_wrap_command
+import pssh.clients.native
 
-class SSHClient(PSSHClient):
-    # do not copy.deepcopy the pssh SSHClient object, just
-    # return a reference to the object (self)
-    # - https://docs.python.org/3/library/copy.html
+# socket handling (ssh) behaves differently inside a child process when using multiprocessing
+# pssh.native.parallel.SSHClient handles this well, but the function signatures and return values
+# and other behaviour changes, like downloading files to something other than what we told it to.
+# it does this because it expects to be handling multiprocessing itself, rather than multiprocessing
+# handled by something else and remote calls being made within it.
+# the below wraps this all up
+
+class SSHClient(object):
+    def __init__(self, **kwargs):
+        self.parallel = state.ENV.get('parallel', False)
+
+        if self.parallel:
+            host = kwargs.pop('host')
+            self.host = host
+            self.client = pssh.clients.native.parallel.ParallelSSHClient([host], **kwargs)
+        else:
+            self.host = kwargs['host']
+            self.client = pssh.client.native.SSHClient(**kwargs)
+
+    def run_command(self, command, user, use_pty):
+
+        shell = False
+        sudo = False
+        timeout = None
+        encoding = 'utf-8'
+
+        if self.parallel:
+            stop_on_errors = True,
+            greenlet_timeout = None # = timeout ?
+            host_args = None
+            result = self.client.run_command(command, sudo, user, stop_on_errors, use_pty,  host_args, shell, encoding, timeout, greenlet_timeout)
+            self._last_result = result
+            result = result[self.host]
+            # result is a 'HostOutput' object
+            # https://parallel-ssh.readthedocs.io/en/latest/output.html#pssh.output.HostOutput
+            return (result['channel'], result['host'], result['stdout'], result['stderr'], result['stdin'])
+
+        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
+        result = self.client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
+        self._last_result = result
+        return result
+
+    def copy_file(self, **kwargs):
+        if self.parallel:
+            raise NotImplementedError('copy_file')
+        return self.client.copy_file(**kwargs)
+
+    def copy_remote_file(self, **kwargs):
+        if self.parallel:
+            raise NotImplementedError('copy_remote_file')
+        return self.client.copy_remote_file(**kwargs)
+
+    def get_exit_code(self):
+        if self.parallel:
+            self.client.join(self._last_result)
+            return self._last_result[self.host]['exit_code']
+
+        channel = self._last_result[0]
+        self.client.wait_finished(channel)
+        return channel.get_exit_status()
+
+    def disconnect(self):
+        if self.parallel:
+            raise NotImplementedError('disconnect')
+        return self.client.disconnect()
+
     def __deepcopy__(self, memo):
+        # do not copy.deepcopy ourselves or the pssh SSHClient object, just
+        # return a reference to the object (self)
+        # - https://docs.python.org/3/library/copy.html
         return self
 
 class NetworkError(BaseException):
@@ -42,59 +107,6 @@ class NetworkError(BaseException):
         new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
         original_error = str(self.wrapped)
         return new_error + original_error
-
-# utils
-
-# direct copy from Fabric:
-# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L33-L46
-# TODO: adjust licence accordingly
-def _shell_escape(string):
-    """
-    Escape double quotes, backticks and dollar signs in given ``string``.
-    For example::
-        >>> _shell_escape('abc$')
-        'abc\\\\$'
-        >>> _shell_escape('"')
-        '\\\\"'
-    """
-    for char in ('"', '$', '`'):
-        string = string.replace(char, r'\%s' % char)
-    return string
-
-# https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L253-L256
-def shell_wrap_command(command):
-    """wraps the given command in a shell invocation.
-    default shell is /bin/bash (like Fabric)
-    no support for configurable shell at present"""
-
-    # '-l' is 'login' shell
-    # '-c' is 'run command'
-    shell_prefix = "/bin/bash -l -c"
-
-    escaped_command = _shell_escape(command)
-    escaped_wrapped_command = '"%s"' % escaped_command
-
-    space = " "
-    final_command = shell_prefix + space + escaped_wrapped_command
-
-    return final_command
-
-def sudo_wrap_command(command):
-    """adds a 'sudo' prefix to command to run as root. 
-    no support for sudo'ing to configurable users/groups"""
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L605-L623
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L374-L376
-    # note: differs from Fabric. they support interactive input of password, users and groups
-    # we use it exclusively to run commands as root
-    sudo_prefix = "sudo --non-interactive"
-    space = " "
-    return sudo_prefix + space + command
-
-def pwd_wrap_command(command, working_dir):
-    "adds a 'cd' prefix to command"
-    prefix = 'cd "%s" &&' % working_dir
-    space = " "
-    return prefix + space + command
 
 def handle(base_kwargs, kwargs):
     key_list = base_kwargs.keys()
@@ -165,33 +177,15 @@ def _ssh_client(**kwargs):
 
     return client
 
-# todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
-# should probably be wrapped `__init__/execute`
 def _execute(command, user, key_filename, host_string, port, use_pty):
-    """creates an SSHClient object and executes given `command` with the given parameters.
-    it does not consult global state and all parameters must be explicitly passed in.
-    keep this function as simple as possible."""
-
+    """creates an SSHClient object and executes given `command` with the given parameters."""
     client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
     
-    # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
-    sudo = False # handled ourselves
-    shell = False # handled ourselves
-    timeout = None # todo
-    encoding = 'utf-8' # default everywhere
-
     try:
-        channel, host_string, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
-
-        def get_exitcode():
-            """we can't know the exit code until command has finished running but we *can* access
-            the output streams. attempting to realise the exitcode will cause the thread of execution 
-            to block until the channel is finished"""
-            client.wait_finished(channel) # `timeout` here
-            return channel.get_exit_status()
+        channel, host_string, stdout, stderr, stdin = client.run_command(command, user, use_pty) #, encoding, timeout)
 
         return {
-            'return_code': get_exitcode,
+            'return_code': client.get_exit_code,
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
