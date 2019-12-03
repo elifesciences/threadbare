@@ -14,7 +14,7 @@
 - [x] implement `lcd`
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
-- [ ] implement 'timeout'
+- [x] implement 'timeout'
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
