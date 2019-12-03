@@ -25,7 +25,7 @@
 - [x] python 3 tests
 - [ ] integrate with builder and fix any inconsistencies
 - [ ] convert example.py to a proper test suite
-- [ ] linting
+- [x] linting
 - [ ] coverage
 
 ## investigate:
