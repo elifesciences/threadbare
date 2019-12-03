@@ -2,17 +2,17 @@ import tempfile
 import contextlib
 import subprocess
 import getpass
-from pssh.clients.native import SSHClient as PSSHClient
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
-from threadbare.common import merge, subdict, rename, cwd
+from threadbare.common import merge, subdict, rename, cwd, sudo_wrap_command, pwd_wrap_command, shell_wrap_command
+from pssh.clients.native import SSHClient as PSSHClient
 
 class SSHClient(PSSHClient):
-    # do not copy.deepcopy the pssh SSHClient object, just
-    # return a reference to the object (self)
-    # - https://docs.python.org/3/library/copy.html
     def __deepcopy__(self, memo):
+        # do not copy.deepcopy ourselves or the pssh SSHClient object, just
+        # return a reference to the object (self)
+        # - https://docs.python.org/3/library/copy.html
         return self
 
 class NetworkError(BaseException):
@@ -42,59 +42,6 @@ class NetworkError(BaseException):
         new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
         original_error = str(self.wrapped)
         return new_error + original_error
-
-# utils
-
-# direct copy from Fabric:
-# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L33-L46
-# TODO: adjust licence accordingly
-def _shell_escape(string):
-    """
-    Escape double quotes, backticks and dollar signs in given ``string``.
-    For example::
-        >>> _shell_escape('abc$')
-        'abc\\\\$'
-        >>> _shell_escape('"')
-        '\\\\"'
-    """
-    for char in ('"', '$', '`'):
-        string = string.replace(char, r'\%s' % char)
-    return string
-
-# https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L253-L256
-def shell_wrap_command(command):
-    """wraps the given command in a shell invocation.
-    default shell is /bin/bash (like Fabric)
-    no support for configurable shell at present"""
-
-    # '-l' is 'login' shell
-    # '-c' is 'run command'
-    shell_prefix = "/bin/bash -l -c"
-
-    escaped_command = _shell_escape(command)
-    escaped_wrapped_command = '"%s"' % escaped_command
-
-    space = " "
-    final_command = shell_prefix + space + escaped_wrapped_command
-
-    return final_command
-
-def sudo_wrap_command(command):
-    """adds a 'sudo' prefix to command to run as root. 
-    no support for sudo'ing to configurable users/groups"""
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L605-L623
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L374-L376
-    # note: differs from Fabric. they support interactive input of password, users and groups
-    # we use it exclusively to run commands as root
-    sudo_prefix = "sudo --non-interactive"
-    space = " "
-    return sudo_prefix + space + command
-
-def pwd_wrap_command(command, working_dir):
-    "adds a 'cd' prefix to command"
-    prefix = 'cd "%s" &&' % working_dir
-    space = " "
-    return prefix + space + command
 
 def handle(base_kwargs, kwargs):
     key_list = base_kwargs.keys()
@@ -145,7 +92,8 @@ def _ssh_client(**kwargs):
         return SSHClient(**final_kwargs)
 
     client_map_key = "ssh_client"
-    client_key = tuple(sorted(final_kwargs.items()))
+    client_key = subdict(final_kwargs, ['user', 'host', 'pkey', 'port', 'timeout'])
+    client_key = tuple(sorted(client_key.items()))
     
     # otherwise, check to see if a previous client is available
     client_map = env.get(client_map_key, {})
@@ -165,39 +113,34 @@ def _ssh_client(**kwargs):
 
     return client
 
-# todo: 'api.py' and '__init__.py' are poorly named and this function + a `local` function
-# should probably be wrapped `__init__/execute`
 def _execute(command, user, key_filename, host_string, port, use_pty):
-    """creates an SSHClient object and executes given `command` with the given parameters.
-    it does not consult global state and all parameters must be explicitly passed in.
-    keep this function as simple as possible."""
-
+    """creates an SSHClient object and executes given `command` with the given parameters."""
     client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
-    
-    # https://github.com/ParallelSSH/parallel-ssh/blob/1.9.1/pssh/clients/native/single.py#L408
-    sudo = False # handled ourselves
+
     shell = False # handled ourselves
-    timeout = None # todo
-    encoding = 'utf-8' # default everywhere
+    sudo = False # handled ourselves
+    user = None # user to sudo to
+    timeout = None # TODO
+    encoding = 'utf-8' # used everywhere
 
     try:
+        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
         channel, host_string, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
 
-        def get_exitcode():
-            """we can't know the exit code until command has finished running but we *can* access
-            the output streams. attempting to realise the exitcode will cause the thread of execution 
-            to block until the channel is finished"""
-            client.wait_finished(channel) # `timeout` here
+        def get_exit_code():
+            client.wait_finished(channel)
             return channel.get_exit_status()
 
         return {
-            'return_code': get_exitcode,
+            # defer executing as it consumes output entirely before returning. this
+            # removes our chance to display/transform output as it is streamed to us
+            'return_code': get_exit_code,
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
         }
     except BaseException as ex:
-        # *most likely* a network error:
+        # *probably* a network error:
         # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
         raise NetworkError(ex)
 
@@ -278,10 +221,9 @@ def remote(command, **kwargs):
     }
     execute_kwargs = merge(final_kwargs, execute_kwargs)
     execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'key_filename', 'host_string', 'port', 'use_pty'])
+
     # TODO: validate `_execute`s args. `host_string` can't be None for example
 
-    #print('final kwargs',execute_kwargs)
-    
     # run command
     result = _execute(**execute_kwargs)
 

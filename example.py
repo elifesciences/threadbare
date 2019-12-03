@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from threadbare import execute
 from threadbare import state
 from threadbare.state import settings
 from threadbare.operations import remote, remote_file_exists, remote_sudo, local, download, upload, single_command, lcd, rcd
@@ -160,14 +161,14 @@ def upload_file_to_root_dir():
 
     assert remote_file_exists(remote_file_name, use_sudo=True)
 
-def upload_bytes_to_remote_file():
+def _upload_bytes_to_remote_file():
     unicode_buffer = BytesIO(b"foobarbaz")
     remote_file_name = '/tmp/threadbare-bytes-test.temp'
     upload(unicode_buffer, remote_file_name)
     print(remote('cat "%s"' % remote_file_name))
     return remote_file_name
 
-def download_file_to_local_bytes(remote_file_name):
+def _download_file_to_local_bytes(remote_file_name):
     assert remote_file_exists(remote_file_name)
     unicode_buffer = BytesIO()
     download(remote_file_name, unicode_buffer)
@@ -175,8 +176,64 @@ def download_file_to_local_bytes(remote_file_name):
 
 def upload_and_download_a_file_using_bytes():
     with settings(quiet=True):
-        remote_file_name = upload_bytes_to_remote_file()
-        download_file_to_local_bytes(remote_file_name)
+        remote_file_name = _upload_bytes_to_remote_file()
+        _download_file_to_local_bytes(remote_file_name)
+
+def check_remote_files():
+    "check that remote files can be found (or not)"
+    file_that_exists = "/var/log/syslog"
+    file_that_does_not_exist = "/foo/bar"
+    assert remote_file_exists(file_that_exists)
+    assert not remote_file_exists(file_that_does_not_exist)
+
+def test_check_many_remote_files():
+    remote_file_list = [
+        '/var/log/syslog', # True, exists
+        '/foo/bar'         # False, doesn't exist
+    ]
+
+    @execute.parallel
+    def workerfn():
+        with state.settings() as env:
+            return remote_file_exists(env['remote_file'], use_sudo=True)
+
+    expected = [True, False]
+    result = execute.execute(state.ENV, workerfn, param_key='remote_file', param_values=remote_file_list)
+    assert expected == result
+
+def mix_match_ssh_clients1():
+    print('--------1-1')
+    run_a_remote_command() # works
+    print('--------1-2')
+    test_check_many_remote_files() # works with monkey_patch 
+    print('--------1-3')
+    run_a_remote_command() # works
+
+def mix_match_ssh_clients2():
+    print('--------2-1')
+    test_check_many_remote_files() # works
+    print('--------2-2')
+    run_a_remote_command() # works
+
+def mix_match_ssh_clients3():
+    print('--------3-1')
+    test_check_many_remote_files() # works
+    print('--------3-2')
+    run_a_remote_command() # works
+    print('--------3-3')
+    test_check_many_remote_files() # works with monkey_patch
+
+def mix_match_ssh_clients4():
+    print('--------4-1')
+    test_check_many_remote_files() # works
+    print('--------4-2')
+    test_check_many_remote_files() # works
+
+def mix_match_ssh_clients():
+    mix_match_ssh_clients1()
+    mix_match_ssh_clients2()
+    mix_match_ssh_clients3()
+    mix_match_ssh_clients4()
 
 def main():
     nest_some_settings()
@@ -198,7 +255,10 @@ def main():
         upload_and_download_a_file()
         upload_file_to_root_dir()
         download_file_owned_by_root()
+        upload_and_download_a_file_using_bytes()
+        test_check_many_remote_files()
 
+        mix_match_ssh_clients()
 
 if __name__ == '__main__':
     main()
