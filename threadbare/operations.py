@@ -79,10 +79,17 @@ def lcd(local_dir):
 @contextlib.contextmanager
 def rcd(remote_working_dir):
     "ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run"
+    # TODO: this will cause a new ssh connection to be created
     with state.settings() as env:
         env["remote_working_dir"] = remote_working_dir
         yield
 
+@contextlib.contextmanager
+def hide(what=None):
+    "hides *all* output, regardless of `what` type of output is to be hidden."
+    # TODO: this will cause a new ssh connection to be created
+    with state.settings(quiet=True) as env:
+        yield
 
 def _ssh_client(**kwargs):
     """returns an instance of pssh.clients.native.SSHClient
