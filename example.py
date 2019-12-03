@@ -59,12 +59,14 @@ def test_run_a_remote_command():
 
 
 def test_run_a_remote_command_in_a_different_dir():
+    "run a simple remote command in a different remote directory"
     with test_settings():
         with rcd("/tmp"):
             print(remote("pwd"))
 
 
 def test_run_a_remote_command_as_root():
+    "run a simple remote command as root"
     with test_settings():
         print(remote_sudo("cd /root && echo tapdance in $(pwd)"))
 
@@ -146,7 +148,7 @@ def _modify_local_file(local_file_name):
 
 
 def test_upload_and_download_a_file():
-    "write a local file, upload it to the remote server, modify it remotely, download it, modify it again, assert it's contents are as expected"
+    "write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, assert it's contents are as expected"
     with test_settings():
         print("uploading file ...")
         local_file_name = "/tmp/threadbare-payload.tmp"
@@ -236,6 +238,8 @@ def _download_file_to_local_bytes(remote_file_name):
 
 
 def test_upload_and_download_a_file_using_bytes():
+    """contents of a BytesIO buffer can be uploaded to a remote file, 
+    and the contents of a remote file can be downloaded to a BytesIO buffer"""
     with test_settings(quiet=True):
         remote_file_name = _upload_bytes_to_remote_file()
         _download_file_to_local_bytes(remote_file_name)
@@ -251,6 +255,8 @@ def test_check_remote_files():
 
 
 def test_check_many_remote_files():
+    "checks multiple remote files for existence in parallel"
+
     @execute.parallel
     def workerfn():
         with state.settings() as env:
@@ -269,33 +275,40 @@ def test_check_many_remote_files():
         assert expected == result
 
 
+# see `threadbare/__init__.py` for gevent monkey patching that allows
+# gevent threads (pssh), python futures (boto) and python multiprocessing (threadbare/fabric)
+# to work harmoniously
+
+
 def test_mix_match_ssh_clients1():
-    print("--------1-1")
+    "remote commands run serially, then in parallel, then serially don't interfere with each other"
+    # main process
     test_run_a_remote_command()  # works
-    print("--------1-2")
+    # child processes
     test_check_many_remote_files()  # works with monkey_patch
-    print("--------1-3")
+    # main process again
     test_run_a_remote_command()  # works
 
 
 def test_mix_match_ssh_clients2():
-    print("--------2-1")
+    "remote command run after parallel remote commands don't interfere with each other"
+    # child processes
     test_check_many_remote_files()  # works
-    print("--------2-2")
+    # main process again
     test_run_a_remote_command()  # works
 
 
 def test_mix_match_ssh_clients3():
-    print("--------3-1")
+    "remote commands run in parallel, then serially, then in parallel again don't interfere with each other"
+    # child processes
     test_check_many_remote_files()  # works
-    print("--------3-2")
+    # main process
     test_run_a_remote_command()  # works
-    print("--------3-3")
+    # child processes
     test_check_many_remote_files()  # works with monkey_patch
 
 
 def test_mix_match_ssh_clients4():
-    print("--------4-1")
+    "remote commands run in parallel after each other don't interface with each other"
     test_check_many_remote_files()  # works
-    print("--------4-2")
     test_check_many_remote_files()  # works
