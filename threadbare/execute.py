@@ -134,12 +134,14 @@ def _serial_execution(env, func, param_key, param_values):
     result_list = []
     if param_key and param_values:
         for x in param_values:
+            # TODO: this prevent ssh clients from being shared
             with state.settings(env, **{param_key: x}):
                 result_list.append(func())
     else:
         # pretty boring :(
         # I could set '_idx' or something in `env` I suppose ..
         for _ in range(0, getattr(func, "pool_size", 1)):
+            # TODO: this prevent ssh clients from being shared
             with state.settings(env):
                 result_list.append(func())
     return result_list

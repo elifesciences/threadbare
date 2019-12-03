@@ -66,6 +66,45 @@ def test_run_a_local_command_in_a_different_dir():
         assert result["succeeded"]
 
 
+def test_run_many_local_commands_serially():
+    "run a list of commands serially. `serial` exists to complement `parallel`"
+    command_list = [
+        "echo all",
+        "echo these commands",
+        "echo are executed",
+        "echo in serially",
+    ]
+
+    def myfn():
+        return local(state.ENV["cmd"], capture=True)
+
+    results = execute.execute(
+        state.ENV, myfn, param_key="cmd", param_values=command_list
+    )
+    assert len(results) == len(command_list)
+    assert results[-2]["stdout"][0] == "are executed"
+
+
+def test_run_many_local_commands_in_parallel():
+    "run a set of commands in parallel using Python's multiprocessing"
+    command_list = [
+        "echo all",
+        "echo these commands",
+        "echo are executed",
+        "echo in parallel",
+    ]
+
+    @execute.parallel
+    def myfn():
+        return local(state.ENV["cmd"], capture=True)
+
+    results = execute.execute(
+        state.ENV, myfn, param_key="cmd", param_values=command_list
+    )
+    assert len(results) == len(command_list)
+    assert results[-2]["stdout"][0] == "are executed"
+
+
 # remote tests
 
 
@@ -98,6 +137,8 @@ def test_run_a_remote_command_with_separate_streams():
             'echo "standard out"; >&2 echo "standard error"', combine_stderr=False,
         )
         assert result["succeeded"]
+        assert result["stdout"] == ["standard out"]
+        assert result["stderr"] == ["standard error"]
 
 
 def test_run_a_remote_command_non_zero_return_code():
@@ -143,11 +184,49 @@ def test_run_many_remote_commands_singly():
 
 
 def test_run_many_remote_commands_serially():
-    pass
+    """run a list of remote commands serially. remote commands run serially 
+    with `execute` do not share a ssh connection (at time of writing)"""
+    command_list = [
+        "echo all",
+        "echo these commands",
+        "echo are executed",
+        "echo serially and remotely",
+    ]
+
+    def myfn():
+        return remote(state.ENV["cmd"], capture=True)
+
+    with test_settings():
+        results = execute.execute(
+            state.ENV, myfn, param_key="cmd", param_values=command_list
+        )
+        assert len(results) == len(command_list)
+        assert results[-2]["stdout"][0] == "are executed"
 
 
 def test_run_many_remote_commands_in_parallel():
-    pass
+    """run a list of remote commands in parallel. remote commands run with `execute` 
+    do not share a ssh connection.
+    
+    the order of results can be guaranteed but not the order in which any output is 
+    written to the screen."""
+    command_list = [
+        "echo all",
+        "echo these commands",
+        "echo are executed",
+        "echo remotely and in parallel",
+    ]
+
+    @execute.parallel
+    def myfn():
+        return remote(state.ENV["cmd"], capture=True)
+
+    with test_settings(quiet=True):
+        results = execute.execute(
+            state.ENV, myfn, param_key="cmd", param_values=command_list
+        )
+        assert len(results) == len(command_list)
+        assert results[-2]["stdout"][0] == "are executed"
 
 
 def _upload_a_file(local_file_name):
