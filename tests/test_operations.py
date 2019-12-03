@@ -7,7 +7,7 @@ except ImportError:
     import mock
     from mock import patch
 
-from threadbare import operations
+from threadbare import operations, state
 from threadbare.common import merge, cwd
 from pssh import exceptions as pssh_exceptions
 
@@ -18,11 +18,25 @@ USER = "testuser"
 PORT = 666
 PEM = "/home/testuser/.ssh/id_rsa"
 
+def test_hide():
+    "`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric."
+    with operations.hide():
+        assert state.ENV == {'quiet': True}
+
+def test_hide_w_args():
+    "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored"
+    with operations.hide('egg'):
+        assert state.ENV == {'quiet': True}
 
 def test_rcd():
     "`operations.rcd` causes the command to be executed to happen in a different directory"
     with patch("threadbare.operations._execute") as mockobj:
         with operations.rcd("/tmp"):
+            mockobj.return_value = {
+                "return_code": lambda: 0,
+                "stdout": [],
+                "stderr": [],
+            }
             operations.remote(
                 "pwd", host_string=HOST, port=PORT, user=USER, key_filename=PEM
             )
@@ -41,6 +55,7 @@ def test_rcd():
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
     with patch("threadbare.operations._execute") as mockobj:
+        mockobj.return_value = {"return_code": lambda: 0, "stdout": [], "stderr": []}
         operations.remote(
             "echo hello", host_string=HOST, port=PORT, user=USER, key_filename=PEM
         )
@@ -59,6 +74,7 @@ def test_remote_args_to_execute():
 def test_remote_sudo_args_to_execute():
     "`operations.remote_sudo` calls `operations._execute` with the correct arguments"
     with patch("threadbare.operations._execute") as mockobj:
+        mockobj.return_value = {"return_code": lambda: 0, "stdout": [], "stderr": []}
         operations.remote_sudo(
             "echo hello", host_string=HOST, port=PORT, user=USER, key_filename=PEM
         )
@@ -151,6 +167,11 @@ def test_remote_non_default_args():
     ]
     for given_kwargs, expected_kwargs in cases:
         with patch("threadbare.operations._execute") as mockobj:
+            mockobj.return_value = {
+                "return_code": lambda: 0,
+                "stdout": [],
+                "stderr": [],
+            }
             operations.remote(**merge(base, given_kwargs))
             mockobj.assert_called_with(**merge(base, expected_kwargs))
 

@@ -41,7 +41,7 @@ class NetworkError(BaseException):
         custom_error_prefixes = {
             # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
             # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
-            pssh_exceptions.Timeout: "Timed out trying to connect." + space,
+            pssh_exceptions.Timeout: "Timed out trying to connect.",
             # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
             # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
             # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
@@ -79,8 +79,16 @@ def lcd(local_dir):
 @contextlib.contextmanager
 def rcd(remote_working_dir):
     "ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run"
-    with state.settings() as env:
-        env["remote_working_dir"] = remote_working_dir
+    # TODO: this will cause a new ssh connection to be created
+    with state.settings(remote_working_dir=remote_working_dir):
+        yield
+
+
+@contextlib.contextmanager
+def hide(what=None):
+    "hides *all* output, regardless of `what` type of output is to be hidden."
+    # TODO: this will cause a new ssh connection to be created
+    with state.settings(quiet=True):
         yield
 
 
@@ -254,15 +262,20 @@ def remote(command, **kwargs):
 
     # handle stdout/stderr streams
     output_kwargs = subdict(final_kwargs, ["quiet", "discard_output"])
+    stdout = _process_output(sys.stdout, result["stdout"], **output_kwargs)
+    stderr = _process_output(sys.stderr, result["stderr"], **output_kwargs)
+
+    # command must have finished before we have access to return code
+    return_code = result["return_code"]()
     result.update(
         {
-            "stdout": _process_output(sys.stdout, result["stdout"], **output_kwargs),
-            "stderr": _process_output(sys.stderr, result["stderr"], **output_kwargs),
-            # command must have finished before we have access to return code
-            "return_code": result["return_code"](),
+            "stdout": stdout,
+            "stderr": stderr,
+            "return_code": return_code,
+            "failed": return_code > 0,
+            "succeeded": return_code == 0,
         }
     )
-
     return result
 
 

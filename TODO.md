@@ -14,6 +14,7 @@
 - [x] implement `lcd`
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
+- [ ] implement 'timeout'
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
@@ -23,8 +24,8 @@
 - [ ] test automation
 - [x] python 2 tests
 - [x] python 3 tests
-- [ ] integrate with builder and fix any inconsistencies
-- [ ] convert example.py to a proper test suite
+- [x] integrate with builder
+- [x] convert example.py to a proper test suite
 - [x] linting
 - [ ] coverage
 
