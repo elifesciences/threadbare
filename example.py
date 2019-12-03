@@ -211,7 +211,7 @@ def mix_match_ssh_clients():
     # single client
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
         run_a_remote_command() # works
-        check_many_remote_files() # doesn't 
+        check_many_remote_files() # doesn't  # works with monkey_patch 
         run_a_remote_command() # works
 
 def mix_match_ssh_clients2():
@@ -226,7 +226,7 @@ def mix_match_ssh_clients3():
         print('--------2')
         run_a_remote_command() # works
         print('--------3')
-        check_many_remote_files() # doesn't
+        check_many_remote_files() # doesn't # works with monkey_patch
 
 def mix_match_ssh_clients4():
     with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
@@ -234,9 +234,6 @@ def mix_match_ssh_clients4():
         check_many_remote_files() # works
 
 def main():
-    mix_match_ssh_clients3()
-    return
-    '''
     nest_some_settings()
     run_a_local_command()
     run_a_local_command_with_separate_streams()
@@ -258,6 +255,6 @@ def main():
         download_file_owned_by_root()
         upload_and_download_a_file_using_bytes()
         check_many_remote_files()
-    '''
+
 if __name__ == '__main__':
     main()

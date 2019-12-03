@@ -91,9 +91,9 @@ def test_execute_many_parallel_with_params():
     param_key = 'mykey'
     param_values = [1,2,3]
     
-    expected = [{'parent': 'environment', "mykey": 1},
-                {'parent': 'environment', "mykey": 2},
-                {'parent': 'environment', "mykey": 3}]
+    expected = [{'parallel': True, 'parent': 'environment', "mykey": 1},
+                {'parallel': True, 'parent': 'environment', "mykey": 2},
+                {'parallel': True, 'parent': 'environment', "mykey": 3}]
 
     with settings(parent='environment') as env:
         assert expected == execute.execute(env, parallel_fn, param_key, param_values)
@@ -108,9 +108,9 @@ def test_execute_many_parallel_raw_results():
     param_key = 'mykey'
     param_values = [1, 2, 3]
     expected = [
-        {'name': 'process--1', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 1}},
-        {'name': 'process--2', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 2}},
-        {'name': 'process--3', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parent': 'environment', 'mykey': 3}}]
+        {'name': 'process--1', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parallel': True, 'parent': 'environment', 'mykey': 1}},
+        {'name': 'process--2', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parallel': True, 'parent': 'environment', 'mykey': 2}},
+        {'name': 'process--3', 'exitcode': 0, 'alive': False, 'killed': False, 'kill-signal': None, 'result': {'parallel': True, 'parent': 'environment', 'mykey': 3}}]
     result_list = execute._parallel_execution(env, parallel_fn, param_key, param_values)
 
     # process pid is available but is not compared during testing. it's non-deterministic
