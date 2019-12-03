@@ -254,15 +254,20 @@ def remote(command, **kwargs):
 
     # handle stdout/stderr streams
     output_kwargs = subdict(final_kwargs, ["quiet", "discard_output"])
+    stdout = _process_output(sys.stdout, result["stdout"], **output_kwargs)
+    stderr = _process_output(sys.stderr, result["stderr"], **output_kwargs)
+
+    # command must have finished before we have access to return code
+    return_code = result["return_code"]()
     result.update(
         {
-            "stdout": _process_output(sys.stdout, result["stdout"], **output_kwargs),
-            "stderr": _process_output(sys.stderr, result["stderr"], **output_kwargs),
-            # command must have finished before we have access to return code
-            "return_code": result["return_code"](),
+            "stdout": stdout,
+            "stderr": stderr,
+            "return_code": return_code,
+            "failed": return_code > 0,
+            "succeeded": return_code == 0,
         }
     )
-
     return result
 
 

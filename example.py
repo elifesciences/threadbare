@@ -15,6 +15,11 @@ from threadbare.operations import (
     lcd,
     rcd,
 )
+import logging
+
+logging.basicConfig()
+
+LOG = logging.getLogger(__name__)
 
 HOST = os.environ.get("THREADBARE_TEST_HOST")
 USER = os.environ.get("THREADBARE_TEST_USER")
@@ -27,66 +32,87 @@ assert HOST and USER, _help_text
 
 test_settings = partial(settings, user=USER, host_string=HOST)
 
+# local tests
+# see `tests/test_state.py` and `tests/test_operations.py` for more examples
+
 
 def test_nest_some_settings():
     "demonstrates how settings accumulate"
     with settings(foo="bar"):
         with settings(bar="baz"):
             with settings(baz="bup"):
-                print("after three nestings I have the cumulate state: %s" % state.ENV)
+                LOG.debug(
+                    "after three nestings I have the cumulate state: %s" % state.ENV
+                )
+                assert state.ENV == {"foo": "bar", "bar": "baz", "baz": "bup"}
 
 
 def test_run_a_local_command():
     "run a simple local command"
-    print(local("echo hello, world!"))
+    result = local("echo hello, world!")
+    assert result["succeeded"]
 
 
 def test_run_a_local_command_with_separate_streams():
     "run a simple local command but capture the output"
-    print(local("echo hello, world!", capture=True))
+    result = local("echo hello, world!", capture=True)
+    assert result["succeeded"]
 
 
 def test_run_a_local_command_in_a_different_dir():
     "switch to a different local directory to run a command"
     with lcd("/tmp"):
-        print(local("pwd", capture=True))
+        result = local("pwd", capture=True)
+        assert result["succeeded"]
+
+
+# remote tests
 
 
 def test_run_a_remote_command():
     "run a simple remote command"
-    with test_settings():
-        print(remote(r'echo -e "\e[31mDanger Will Robinson!\e[0m"'))
+    with test_settings(quiet=True):
+        result = remote(r'echo -e "\e[31mRed Text!!\e[0m"')
+        assert result["succeeded"]
 
 
 def test_run_a_remote_command_in_a_different_dir():
     "run a simple remote command in a different remote directory"
     with test_settings():
         with rcd("/tmp"):
-            print(remote("pwd"))
+            result = remote("pwd")
+            assert result["succeeded"]
 
 
 def test_run_a_remote_command_as_root():
     "run a simple remote command as root"
     with test_settings():
-        print(remote_sudo("cd /root && echo tapdance in $(pwd)"))
+        result = remote_sudo("cd /root && echo tapdance in $(pwd)")
+        assert result["succeeded"]
 
 
 def test_run_a_remote_command_with_separate_streams():
     "run a simple remote command and capture stdout and stderr separately"
     with test_settings():
-        print(
-            remote(
-                'echo "standard out"; >&2 echo "standard error"; exit 123',
-                combine_stderr=False,
-            )
+        result = remote(
+            'echo "standard out"; >&2 echo "standard error"', combine_stderr=False,
         )
+        assert result["succeeded"]
+
+
+def test_run_a_remote_command_non_zero_return_code():
+    with test_settings():
+        result = remote("exit 123")
+        assert result["return_code"] == 123
+        assert result["failed"]
+        assert not result["succeeded"]
 
 
 def test_run_a_remote_command_with_shell_interpolation():
     "run a simple remote command including variables"
-    with test_settings():
-        print(remote('foo=bar; echo "bar? $foo!"'))
-        print(remote('foo=bar; echo "bar? $foo!"', use_shell=False))
+    with test_settings(quiet=True):
+        assert remote('foo=bar; echo "bar? $foo!"')["succeeded"]
+        assert remote('foo=bar; echo "bar? $foo!"', use_shell=False)["succeeded"]
 
 
 def test_run_many_remote_commands():
@@ -99,7 +125,8 @@ def test_run_many_remote_commands():
     ]
     with test_settings():
         for command in command_list:
-            print(remote(command))
+            result = remote(command)
+            assert result["succeeded"]
 
 
 def test_run_many_remote_commands_singly():
@@ -111,7 +138,8 @@ def test_run_many_remote_commands_singly():
         "echo together",
     ]
     with test_settings():
-        print(remote(single_command(command_list)))
+        result = remote(single_command(command_list))
+        assert result["succeeded"]
 
 
 def test_run_many_remote_commands_serially():
@@ -150,24 +178,22 @@ def _modify_local_file(local_file_name):
 def test_upload_and_download_a_file():
     "write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, assert it's contents are as expected"
     with test_settings():
-        print("uploading file ...")
+        LOG.debug("uploading file ...")
         local_file_name = "/tmp/threadbare-payload.tmp"
         uploaded_file = _upload_a_file(local_file_name)
 
-        print("modifying remote file ...")
+        LOG.debug("modifying remote file ...")
         _modify_remote_file(uploaded_file)
 
-        print("downloading file ...")
+        LOG.debug("downloading file ...")
         new_local_file_name = _download_a_file(uploaded_file)
 
-        print("modifying local file ...")
+        LOG.debug("modifying local file ...")
         _modify_local_file(new_local_file_name)
 
-        print("testing local file ...")
+        LOG.debug("testing local file ...")
         data = open(new_local_file_name, "r").read()
         assert data == "foobarbaz"
-
-        print("good!")
 
 
 def test_download_file_owned_by_root():
@@ -215,34 +241,31 @@ def test_upload_file_to_root_dir():
 
         local_file_name = "/tmp/threadbare-test.temp"
         local('echo foobarbaz > "%s"' % local_file_name)
-        print("uploading file (this is *very* slow over SFTP)")
+        LOG.debug("uploading file (this is *very* slow over SFTP)")
         upload(local_file_name, remote_file_name, use_sudo=True)
-        print("done uploading")
+        LOG.debug("done uploading")
 
         assert remote_file_exists(remote_file_name, use_sudo=True)
 
 
-def _upload_bytes_to_remote_file():
-    unicode_buffer = BytesIO(b"foobarbaz")
-    remote_file_name = "/tmp/threadbare-bytes-test.temp"
-    upload(unicode_buffer, remote_file_name)
-    print(remote('cat "%s"' % remote_file_name))
-    return remote_file_name
-
-
-def _download_file_to_local_bytes(remote_file_name):
-    assert remote_file_exists(remote_file_name)
-    unicode_buffer = BytesIO()
-    download(remote_file_name, unicode_buffer)
-    print(unicode_buffer.getvalue())
-
-
-def test_upload_and_download_a_file_using_bytes():
+def test_upload_and_download_a_file_using_byte_buffers():
     """contents of a BytesIO buffer can be uploaded to a remote file, 
     and the contents of a remote file can be downloaded to a BytesIO buffer"""
     with test_settings(quiet=True):
-        remote_file_name = _upload_bytes_to_remote_file()
-        _download_file_to_local_bytes(remote_file_name)
+        payload = b"foobarbaz"
+
+        uploadable_unicode_buffer = BytesIO(payload)
+        remote_file_name = "/tmp/threadbare-bytes-test.temp"
+        upload(uploadable_unicode_buffer, remote_file_name)
+
+        assert remote_file_exists(remote_file_name)
+        result = remote('cat "%s"' % remote_file_name)
+        assert result["succeeded"]
+        assert result["stdout"][0] == payload.decode()
+
+        download_unicode_buffer = BytesIO()
+        download(remote_file_name, download_unicode_buffer)
+        assert download_unicode_buffer.getvalue() == payload
 
 
 def test_check_remote_files():
