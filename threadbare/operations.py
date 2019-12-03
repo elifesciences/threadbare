@@ -8,60 +8,16 @@ from threadbare import state
 from threadbare.common import merge, subdict, rename, cwd, sudo_wrap_command, pwd_wrap_command, shell_wrap_command
 import pssh.clients.native
 
-import logging
-
-# gevent is used by Parallel-SSH which interferes with Python multiprocessing
-# it causes 'things' to block indefinitely
-# turns out, gevent and futures and multiprocessing are all troublesome together
-# if this code is executing, it's because a remote command is being executed with multiprocessing
-# TODO: this may not work if you want to run a boto command with multiprocessing
-#from gevent import monkey
-#monkey.patch_all(thread=False)
-from gevent import monkey
-monkey.patch_all()
-
-
-# socket handling (ssh) behaves differently inside a child process when using multiprocessing
-# pssh.native.parallel.SSHClient handles this well, but the function signatures and return values
-# and other behaviour changes, like downloading files to something other than what we told it to.
-# it does this because it expects to be handling multiprocessing itself, rather than multiprocessing
-# handled by something else and remote calls being made within it.
-# the below wraps this all up
-
 class SSHClient(object):
     def __init__(self, **kwargs):
-        self.parallel = state.ENV.get('parallel', False)
-        #self.parallel = True # use to switch between ParallelSSHClient and regular SSHClient
+        self.client = pssh.clients.native.SSHClient(**kwargs)
 
-        if self.parallel:
-            host = kwargs.pop('host')
-            self.host = host
-            self.client = pssh.clients.native.parallel.ParallelSSHClient([host], **kwargs)
-        else:
-            self.host = kwargs['host']
-            self.client = pssh.clients.native.SSHClient(**kwargs)
-
-    def run_command(self, command, user, use_pty):
-
-        shell = False
-        sudo = False
-        timeout = None
-        encoding = 'utf-8'
-
-        if self.parallel:
-            stop_on_errors = True,
-            greenlet_timeout = 10 # seconds #None # = timeout ?
-            host_args = None
-
-            result = self.client.run_command(command, sudo, user, stop_on_errors, use_pty,  host_args, shell, encoding, timeout, greenlet_timeout)
-            self._last_result = result
-
-            self.client.join(result)
-            
-            result = result[self.host]
-            # result is a 'HostOutput' object
-            # https://parallel-ssh.readthedocs.io/en/latest/output.html#pssh.output.HostOutput
-            return (result['channel'], result['host'], result['stdout'], result['stderr'], result['stdin'])
+    def run_command(self, command, use_pty):
+        shell = False # handled ourselves
+        sudo = False # handled ourselves
+        timeout = None # TODO
+        encoding = 'utf-8' # used everywhere
+        user = None
 
         # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
         result = self.client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
@@ -69,30 +25,17 @@ class SSHClient(object):
         return result
 
     def copy_file(self, local_path, remote_path):
-        if self.parallel:
-            raise NotImplementedError('copy_file')
         return self.client.copy_file(local_path, remote_path)
 
     def copy_remote_file(self, remote_path, local_path):
-        if self.parallel:
-            raise NotImplementedError('copy_remote_file')
         return self.client.copy_remote_file(remote_path, local_path)
 
     def get_exit_code(self):
-        if self.parallel:
-            self.client.join(self._last_result)
-            return self._last_result[self.host]['exit_code']
-
         channel = self._last_result[0]
         self.client.wait_finished(channel)
         return channel.get_exit_status()
 
     def disconnect(self):
-        if self.parallel:
-            if self.host in self.client.host_clients:
-                self.client.host_clients[self.host].disconnect()
-            return
-
         return self.client.disconnect()
 
     def __deepcopy__(self, memo):
@@ -178,7 +121,6 @@ def _ssh_client(**kwargs):
         return SSHClient(**final_kwargs)
 
     client_map_key = "ssh_client"
-    #client_key = tuple(sorted(final_kwargs.items()))
     client_key = subdict(final_kwargs, ['user', 'host', 'pkey', 'port', 'timeout'])
     client_key = tuple(sorted(client_key.items()))
     
@@ -205,16 +147,16 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
     client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
     
     try:
-        channel, host_string, stdout, stderr, stdin = client.run_command(command, user, use_pty) #, encoding, timeout)
+        channel, host_string, stdout, stderr, stdin = client.run_command(command, use_pty) #, encoding, timeout)
 
         return {
-            'return_code': client.get_exit_code(),
+            'return_code': client.get_exit_code,
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
         }
     except BaseException as ex:
-        # *most likely* a network error:
+        # *probably* a network error:
         # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
         raise NetworkError(ex)
 
@@ -309,7 +251,7 @@ def remote(command, **kwargs):
         'stderr': _process_output(sys.stderr, result['stderr'], **output_kwargs),
 
         # command must have finished before we have access to return code
-        'return_code': result['return_code'] #(), 
+        'return_code': result['return_code'](), 
     })
 
     return result

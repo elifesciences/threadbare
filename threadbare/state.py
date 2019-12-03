@@ -29,8 +29,12 @@ def read_write(d):
     if hasattr(d, 'read_only'):
         d.read_only = False
 
-ENV = LockableDict()
-read_only(ENV)
+def init_state():
+    new_env = LockableDict()
+    read_only(new_env)
+    return new_env
+        
+ENV = init_state()
 
 # used to determine how deeply nested we are
 DEPTH = 0

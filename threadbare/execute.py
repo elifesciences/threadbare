@@ -30,7 +30,7 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         # implicit `settings() as env` invocation rather than `settings(env)` as we have
         # no reference to `env` unless the worker function accepts it as a parameter.
         # and we can't rely on that.
-        state.ENV = state.LockableDict()
+        state.ENV = state.init_state() #LockableDict() # reset the state
         state.read_write(state.ENV)
         state.ENV.update(env or {})
         result = worker_func()
@@ -72,20 +72,14 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
         kwargs['name'] = 'process--' + str(idx + 1) # process--1, process--2
         new_env = {} if not env else copy.deepcopy(env)
 
-        if 'ssh_client' in new_env:
-            #state.cleanup(new_env) # dont do this, parent may need the connection
-            del new_env['ssh_client']
-
         # ssh clients are not shared between processes
-        #print('new env', new_env)
+        if 'ssh_client' in new_env:
+            del new_env['ssh_client']
 
         new_env[param_key] = nth_val
         new_env['parallel'] = True
-
-        # lets not set these until we need them:
-        # new_env['parallel'] = True
-        # new_env['linewise'] = True
         # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L223-L227
+        # new_env['linewise'] = True # not set until needed
 
         kwargs['env'] = new_env
         p = Process(name=kwargs['name'], target=_parallel_execution_worker_wrapper, kwargs=kwargs)

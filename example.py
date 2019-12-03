@@ -186,7 +186,7 @@ def check_remote_files():
     assert remote_file_exists(file_that_exists)
     assert not remote_file_exists(file_that_does_not_exist)
 
-def check_many_remote_files():
+def test_check_many_remote_files():
     remote_file_list = [
         '/var/log/syslog', # True, exists
         '/foo/bar'         # False, doesn't exist
@@ -195,43 +195,45 @@ def check_many_remote_files():
     @execute.parallel
     def workerfn():
         with state.settings() as env:
-            remote_file = env['remote_file']
-            print("looking for",remote_file)
-            print("I have the environment",env)
-            try:
-                return remote_file_exists(remote_file, use_sudo=True)
-            except BaseException:
-                import traceback
-                print(traceback.format_exc())
+            return remote_file_exists(env['remote_file'], use_sudo=True)
 
-    print(execute.execute(state.ENV, workerfn, param_key='remote_file', param_values=remote_file_list))
+    expected = [True, False]
+    result = execute.execute(state.ENV, workerfn, param_key='remote_file', param_values=remote_file_list)
+    assert expected == result
 
-
-def mix_match_ssh_clients():
-    # single client
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        run_a_remote_command() # works
-        check_many_remote_files() # doesn't  # works with monkey_patch 
-        run_a_remote_command() # works
+def mix_match_ssh_clients1():
+    print('--------1-1')
+    run_a_remote_command() # works
+    print('--------1-2')
+    test_check_many_remote_files() # works with monkey_patch 
+    print('--------1-3')
+    run_a_remote_command() # works
 
 def mix_match_ssh_clients2():
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        check_many_remote_files() # works
-        run_a_remote_command() # works
+    print('--------2-1')
+    test_check_many_remote_files() # works
+    print('--------2-2')
+    run_a_remote_command() # works
 
 def mix_match_ssh_clients3():
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        print('--------1')
-        check_many_remote_files() # works
-        print('--------2')
-        run_a_remote_command() # works
-        print('--------3')
-        check_many_remote_files() # doesn't # works with monkey_patch
+    print('--------3-1')
+    test_check_many_remote_files() # works
+    print('--------3-2')
+    run_a_remote_command() # works
+    print('--------3-3')
+    test_check_many_remote_files() # works with monkey_patch
 
 def mix_match_ssh_clients4():
-    with settings(user='elife', host_string='34.201.187.7', quiet=False, discard_output=False):
-        check_many_remote_files() # works
-        check_many_remote_files() # works
+    print('--------4-1')
+    test_check_many_remote_files() # works
+    print('--------4-2')
+    test_check_many_remote_files() # works
+
+def mix_match_ssh_clients():
+    mix_match_ssh_clients1()
+    mix_match_ssh_clients2()
+    mix_match_ssh_clients3()
+    mix_match_ssh_clients4()
 
 def main():
     nest_some_settings()
@@ -254,7 +256,9 @@ def main():
         upload_file_to_root_dir()
         download_file_owned_by_root()
         upload_and_download_a_file_using_bytes()
-        check_many_remote_files()
+        test_check_many_remote_files()
+
+        mix_match_ssh_clients()
 
 if __name__ == '__main__':
     main()
