@@ -6,38 +6,9 @@ from pssh import exceptions as pssh_exceptions
 import os, sys
 from threadbare import state
 from threadbare.common import merge, subdict, rename, cwd, sudo_wrap_command, pwd_wrap_command, shell_wrap_command
-import pssh.clients.native
+from pssh.clients.native import SSHClient as PSSHClient
 
-class SSHClient(object):
-    def __init__(self, **kwargs):
-        self.client = pssh.clients.native.SSHClient(**kwargs)
-
-    def run_command(self, command, use_pty):
-        shell = False # handled ourselves
-        sudo = False # handled ourselves
-        timeout = None # TODO
-        encoding = 'utf-8' # used everywhere
-        user = None
-
-        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
-        result = self.client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
-        self._last_result = result
-        return result
-
-    def copy_file(self, local_path, remote_path):
-        return self.client.copy_file(local_path, remote_path)
-
-    def copy_remote_file(self, remote_path, local_path):
-        return self.client.copy_remote_file(remote_path, local_path)
-
-    def get_exit_code(self):
-        channel = self._last_result[0]
-        self.client.wait_finished(channel)
-        return channel.get_exit_status()
-
-    def disconnect(self):
-        return self.client.disconnect()
-
+class SSHClient(PSSHClient):
     def __deepcopy__(self, memo):
         # do not copy.deepcopy ourselves or the pssh SSHClient object, just
         # return a reference to the object (self)
@@ -145,12 +116,25 @@ def _ssh_client(**kwargs):
 def _execute(command, user, key_filename, host_string, port, use_pty):
     """creates an SSHClient object and executes given `command` with the given parameters."""
     client = _ssh_client(user=user, host_string=host_string, key_filename=key_filename, port=port)
-    
+
+    shell = False # handled ourselves
+    sudo = False # handled ourselves
+    user = None # user to sudo to
+    timeout = None # TODO
+    encoding = 'utf-8' # used everywhere
+
     try:
-        channel, host_string, stdout, stderr, stdin = client.run_command(command, use_pty) #, encoding, timeout)
+        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
+        channel, host_string, stdout, stderr, stdin = client.run_command(command, sudo, user, use_pty, shell, encoding, timeout)
+
+        def get_exit_code():
+            client.wait_finished(channel)
+            return channel.get_exit_status()
 
         return {
-            'return_code': client.get_exit_code,
+            # defer executing as it consumes output entirely before returning. this
+            # removes our chance to display/transform output as it is streamed to us
+            'return_code': get_exit_code,
             'command': command,
             'stdout': stdout,
             'stderr': stderr,
@@ -237,10 +221,9 @@ def remote(command, **kwargs):
     }
     execute_kwargs = merge(final_kwargs, execute_kwargs)
     execute_kwargs = subdict(execute_kwargs, ['command', 'user', 'key_filename', 'host_string', 'port', 'use_pty'])
+
     # TODO: validate `_execute`s args. `host_string` can't be None for example
 
-    #print('final kwargs',execute_kwargs)
-    
     # run command
     result = _execute(**execute_kwargs)
 
