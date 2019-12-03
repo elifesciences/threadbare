@@ -18,13 +18,15 @@
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
 - [ ] move taskrunner from builder into threadbare, including tests
+- [ ] output is being duplicated, once from logging, once from us. what does builder do?
 - [ ] separate development dependencies from required ones
 - [ ] test automation
-- [ ] python 2 tests
-- [ ] python 3 tests
+- [x] python 2 tests
+- [x] python 3 tests
 - [ ] integrate with builder and fix any inconsistencies
 - [ ] convert example.py to a proper test suite
 - [ ] linting
+- [ ] coverage
 
 ## investigate:
 
