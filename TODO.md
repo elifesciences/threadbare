@@ -23,7 +23,7 @@
 - [ ] test automation
 - [x] python 2 tests
 - [x] python 3 tests
-- [ ] integrate with builder and fix any inconsistencies
+- [x] integrate with builder
 - [x] convert example.py to a proper test suite
 - [x] linting
 - [ ] coverage
