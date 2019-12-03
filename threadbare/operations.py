@@ -1,6 +1,7 @@
 import tempfile
 import contextlib
 import subprocess
+from threading import Timer
 import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
@@ -137,7 +138,7 @@ def _ssh_client(**kwargs):
     return client
 
 
-def _execute(command, user, key_filename, host_string, port, use_pty):
+def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
     """creates an SSHClient object and executes given `command` with the given parameters."""
     client = _ssh_client(
         user=user, host_string=host_string, key_filename=key_filename, port=port
@@ -146,7 +147,6 @@ def _execute(command, user, key_filename, host_string, port, use_pty):
     shell = False  # handled ourselves
     sudo = False  # handled ourselves
     user = None  # user to sudo to
-    timeout = None  # TODO
     encoding = "utf-8"  # used everywhere
 
     try:
@@ -231,6 +231,7 @@ def remote(command, **kwargs):
         "quiet": False,
         "discard_output": False,
         "remote_working_dir": None,
+        "timeout": None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -252,7 +253,15 @@ def remote(command, **kwargs):
     execute_kwargs = merge(final_kwargs, execute_kwargs)
     execute_kwargs = subdict(
         execute_kwargs,
-        ["command", "user", "key_filename", "host_string", "port", "use_pty"],
+        [
+            "command",
+            "user",
+            "key_filename",
+            "host_string",
+            "port",
+            "use_pty",
+            "timeout",
+        ],
     )
 
     # TODO: validate `_execute`s args. `host_string` can't be None for example
@@ -321,6 +330,7 @@ def local(command, **kwargs):
         "use_shell": True,
         "combine_stderr": True,
         "capture": False,
+        "timeout": None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -341,16 +351,24 @@ def local(command, **kwargs):
     if final_kwargs["use_shell"]:
         command = shell_wrap_command(command)
 
-    p = subprocess.Popen(
+    proc = subprocess.Popen(
         command, shell=final_kwargs["use_shell"], stdout=out_stream, stderr=err_stream
     )
-    stdout, stderr = p.communicate()
+    if final_kwargs["timeout"]:
+        timer = Timer(final_kwargs["timeout"], proc.kill)
+        try:
+            timer.start()  # proximity matters
+            stdout, stderr = proc.communicate()
+        finally:
+            timer.cancel()
+    else:
+        stdout, stderr = proc.communicate()
 
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1240-L1244
     return {
-        "return_code": p.returncode,
-        "failed": p.returncode > 0,
-        "succeeded": p.returncode == 0,
+        "return_code": proc.returncode,
+        "failed": proc.returncode != 0,
+        "succeeded": proc.returncode == 0,
         "command": command,
         "stdout": (stdout or b"").decode("utf-8").splitlines(),
         "stderr": (stderr or b"").decode("utf-8").splitlines(),

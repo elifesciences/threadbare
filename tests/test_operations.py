@@ -18,15 +18,18 @@ USER = "testuser"
 PORT = 666
 PEM = "/home/testuser/.ssh/id_rsa"
 
+
 def test_hide():
     "`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric."
     with operations.hide():
-        assert state.ENV == {'quiet': True}
+        assert state.ENV == {"quiet": True}
+
 
 def test_hide_w_args():
     "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored"
-    with operations.hide('egg'):
-        assert state.ENV == {'quiet': True}
+    with operations.hide("egg"):
+        assert state.ENV == {"quiet": True}
+
 
 def test_rcd():
     "`operations.rcd` causes the command to be executed to happen in a different directory"
@@ -47,6 +50,7 @@ def test_rcd():
         "user": USER,
         "key_filename": PEM,
         "use_pty": True,
+        "timeout": None,
         "command": '/bin/bash -l -c "cd \\"/tmp\\" && pwd"',
     }
     mockobj.assert_called_with(**expected_kwargs)
@@ -66,6 +70,7 @@ def test_remote_args_to_execute():
         "user": USER,
         "key_filename": PEM,
         "use_pty": True,
+        "timeout": None,
         "command": '/bin/bash -l -c "echo hello"',
     }
     mockobj.assert_called_with(**expected_kwargs)
@@ -85,6 +90,7 @@ def test_remote_sudo_args_to_execute():
         "user": USER,
         "key_filename": PEM,
         "use_pty": True,
+        "timeout": None,
         "command": 'sudo --non-interactive /bin/bash -l -c "echo hello"',
     }
     mockobj.assert_called_with(**expected_kwargs)
@@ -101,6 +107,7 @@ def test_remote_non_default_args():
         "user": USER,
         "key_filename": PEM,
         "command": "echo hello",
+        "timeout": None,
     }
 
     # given args, expected args
@@ -152,9 +159,14 @@ def test_remote_non_default_args():
             {"remote_working_dir": "/tmp", "command": "pwd", "use_shell": True},
             {"use_pty": True, "command": '/bin/bash -l -c "cd \\"/tmp\\" && pwd"'},
         ],
+        # timeout
+        [
+            {"command": "sleep 5", "timeout": 1},
+            {"use_pty": True, "command": '/bin/bash -l -c "sleep 5"', "timeout": 1},
+        ],
         # edge cases
         # shell, non-tty command
-        # this may be a parallel-ssh bug. in order to combine output streams, `pty` must be off
+        # in order to combine output streams, `pty` must be off
         [
             {"use_pty": False},
             {"use_pty": True, "command": '/bin/bash -l -c "echo hello"'},  # !!
@@ -315,6 +327,21 @@ def test_local_command_split_stderr():
         "stderr": ["standard error"],
     }
     actual = operations.local(command, combine_stderr=False, capture=True)
+    assert expected == actual
+
+
+def test_local_command_timeout():
+    "local commands can be killed if their execution exceeds a timeout threshold"
+    command = "sleep 5"
+    expected = {
+        "succeeded": False,
+        "failed": True,
+        "return_code": -9,  # SIGKILL
+        "command": '/bin/bash -l -c "sleep 5"',
+        "stdout": [],
+        "stderr": [],
+    }
+    actual = operations.local(command, capture=True, timeout=0.1)
     assert expected == actual
 
 
