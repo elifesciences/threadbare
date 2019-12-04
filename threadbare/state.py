@@ -71,7 +71,7 @@ def add_cleanup(fn):
 def settings(state=None, **kwargs):
     global DEPTH
 
-    if state == None:
+    if state is None:
         state = ENV
     if not isinstance(state, dict):
         raise TypeError(

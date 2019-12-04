@@ -10,6 +10,4 @@ find threadbare/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 find tests/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 
 pyflakes threadbare/ tests/ example.py
-
-pip install black
 black threadbare/ tests/ example.py --target-version py34

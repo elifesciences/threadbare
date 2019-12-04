@@ -4,7 +4,7 @@ from functools import reduce
 
 def first(x):
     "returns the first element in an collection of things"
-    if x == None:
+    if x is None:
         return x
     try:
         if isinstance(x, dict):
@@ -84,7 +84,7 @@ def shell_wrap_command(command):
 
 
 def sudo_wrap_command(command):
-    """adds a 'sudo' prefix to command to run as root. 
+    """adds a 'sudo' prefix to command to run as root.
     no support for sudo'ing to configurable users/groups"""
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L605-L623
     # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L374-L376
