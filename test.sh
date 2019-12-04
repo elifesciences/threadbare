@@ -14,5 +14,10 @@ if [ "$dev" = "" ]; then
 else
     shift # pop the first arg off
     source venv/bin/activate
-    PYTHONPATH=threadbare/ python -m pytest tests/ -vv "$@"
+    PYTHONPATH=threadbare/ python -m pytest \
+        tests/ \
+        -vv \
+        --cov=threadbare/ \
+        --cov-fail-under 77 \
+        "$@"
 fi
