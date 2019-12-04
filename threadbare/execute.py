@@ -1,8 +1,8 @@
 import copy
 from multiprocessing import Process, Queue
 import time
-from threadbare.common import first
-from threadbare import state
+from .common import first
+from . import state
 
 
 def serial(func, pool_size=None):
@@ -57,7 +57,7 @@ def process_status(running_p):
         "killed": False,
         "kill-signal": None,
     }
-    if running_p.exitcode != None and running_p.exitcode < 0:
+    if running_p.exitcode is not None and running_p.exitcode < 0:
         result["killed"] = True
         result["kill-signal"] = -running_p.exitcode
     return result
@@ -73,7 +73,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
         "queue": results_q,
     }
     pool_size = getattr(func, "pool_size", None)
-    pool_size = pool_size if pool_size != None else 1
+    pool_size = pool_size if pool_size is not None else 1
     pool_values = param_values or range(0, pool_size)
 
     pool = []
@@ -170,18 +170,18 @@ def execute(env, func, param_key=None, param_values=None):
     # the custom 'JobQueue' adds complexity but can be avoided (I hope):
     # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
 
-    if (param_key and param_values == None) or (param_key == None and param_values):
+    if (param_key and param_values is None) or (param_key is None and param_values):
         raise ValueError(
             "either a `param_key` AND `param_values` are provided OR neither are provided"
         )
 
-    if param_values != None and type(param_values) not in [list, tuple, set]:
+    if param_values is not None and type(param_values) not in [list, tuple, set]:
         raise ValueError(
             "given value for `param_values` must be an iterable type, not %r"
             % type(param_values)
         )
 
-    if param_key != None and not isinstance(param_key, str):
+    if param_key is not None and not isinstance(param_key, str):
         raise ValueError(
             "given value for `param_key` must be a valid function parameter key"
         )

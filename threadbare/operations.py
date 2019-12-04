@@ -5,8 +5,8 @@ from threading import Timer
 import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
-from threadbare import state
-from threadbare.common import (
+from . import state
+from .common import (
     merge,
     subdict,
     rename,
@@ -28,7 +28,7 @@ class SSHClient(PSSHClient):
 
 class NetworkError(BaseException):
     """generic 'died while doing something ssh-related' catch-all exception class.
-    calling str() on this exception will return the results on calling str() on the 
+    calling str() on this exception will return the results on calling str() on the
     wrapped exception."""
 
     def __init__(self, wrapped_exception_inst):
@@ -386,7 +386,7 @@ def single_command(cmd_list):
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
 # use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
 def _download_as_root_hack(remote_path, local_path, **kwargs):
-    """as root, creates a temporary copy of the file that can be downloaded by a 
+    """as root, creates a temporary copy of the file that can be downloaded by a
     regular user and then removes the temporary file.
     warning: don't try to download anything huge `with_sudo` as the file is duplicated.
     warning: the privileged file will be available in /tmp until the download is complete"""
@@ -477,7 +477,7 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
 
 
 def _write_bytes_to_temporary_file(local_path):
-    """if `local_path` is a file-like object, write the contents to an *actual* file and 
+    """if `local_path` is a file-like object, write the contents to an *actual* file and
     return a pair of new local filename and a function that removes the temporary file when called."""
     if hasattr(local_path, "read"):
         # `local_path` is a file-like object
