@@ -1,6 +1,6 @@
 import pytest
 import time
-from threadbare import execute
+from threadbare import execute, state
 from threadbare.state import settings
 
 
@@ -201,3 +201,16 @@ def test_parallel_terminate():
 
     assert expected == actual_result
     assert results_q.empty()
+
+
+def test_execute_with_hosts():
+    "execute with hosts returns a dictionary of results keyed by host, like Fabric does"
+    def workerfn():
+        with settings() as env:
+            return env["host_string"] + "host"
+
+    hosts = ["local", "good"]
+    env = state.ENV
+    results = execute.execute_with_hosts(env, workerfn, hosts)
+    expected = {"local": "localhost", "good": "goodhost"}
+    assert expected == results
