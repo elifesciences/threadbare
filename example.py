@@ -275,6 +275,65 @@ def test_upload_and_download_a_file():
         assert data == "foobarbaz"
 
 
+def test_upload_a_directory():  # you can't
+    "attempting to upload a directory raises an exception"
+    with test_settings():
+        try:
+            upload("/tmp", "/tmp")
+            assert False, "you shouldn't be able to upload a directory!"
+        except ValueError:
+            pass
+
+
+def test_download_a_directory():  # you can't
+    """attempting to download a directory raises an exception.
+    It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
+    with test_settings():
+        try:
+            download("/tmp", "/tmp")
+            assert False, "you shouldn't be able to download a directory!"
+        except ValueError:
+            pass
+
+
+def test_download_an_obvious_directory():  # you can't
+    """attempting to download an obvious directory raises an exception.
+    It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
+    with test_settings():
+        try:
+            download("/tmp/", "/tmp")
+            assert False, "you shouldn't be able to download a directory!"
+        except ValueError:
+            pass
+
+
+def test_download_a_file_to_a_directory():
+    """a file can be downloaded to a directory and the name of the remote file will be used as the destination file"""
+    with test_settings():
+        local_dir = "/tmp"
+        remote_file = "/bin/less"
+        expected_local_file = "/tmp/less"
+        try:
+            new_local_file = download(remote_file, local_dir)
+            assert expected_local_file == new_local_file
+            assert os.path.exists(expected_local_file)
+        finally:
+            local('rm -f "%s"' % expected_local_file)
+
+
+def test_download_a_file_to_a_relative_directory():
+    "relative destinations are expanded to full paths before downloading"
+    with test_settings():
+        with lcd("/tmp"):
+            try:
+                expected_local_file = "/tmp/less"
+                new_local_file = download("/bin/less", ".")
+                assert expected_local_file == new_local_file
+                assert os.path.exists(expected_local_file)
+            finally:
+                local('rm -f "%s"' % expected_local_file)
+
+
 def test_download_file_owned_by_root():
     "a file owned by root can be downloaded by the regular user if 'use_sudo' is True"
     with test_settings():

@@ -193,7 +193,8 @@ def execute(env, func, param_key=None, param_values=None):
 
 
 def execute_with_hosts(env, func, hosts=None):
-    "convenience wrapper around `execute`. calls `execute` on given `func` but uses `all_hosts`  "
+    """convenience wrapper around `execute`. calls `execute` on given `func` for each host in `hosts`.
+    The host is available within the worker function's `env` as `host_string`."""
     host_list = hosts or env.get("hosts") or []
     assert isinstance(host_list, list), "hosts must be a list"
     # Fabric may know about many hosts ('all_hosts') but only be acting upon a subset of them ('hosts')

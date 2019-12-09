@@ -204,7 +204,7 @@ def test_parallel_terminate():
 
 
 def test_execute_with_hosts():
-    "execute with hosts returns a dictionary of results keyed by host, like Fabric does"
+    "`execute_with_hosts` returns a dictionary of results keyed by host. like Fabric."
 
     def workerfn():
         with settings() as env:

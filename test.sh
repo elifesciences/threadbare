@@ -9,9 +9,7 @@ find threadbare/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 find tests/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 
 dev=${1:-""}
-if [ "$dev" = "" ]; then
-    tox --parallel auto
-else
+if [ "$dev" = "dev" ]; then
     shift # pop the first arg off
     source venv/bin/activate
     PYTHONPATH=threadbare/ python -m pytest \
@@ -20,4 +18,6 @@ else
         --cov=threadbare/ \
         --cov-fail-under 77 \
         "$@"
+else
+    tox --parallel auto "$@"
 fi
