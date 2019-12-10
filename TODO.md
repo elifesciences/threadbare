@@ -39,13 +39,12 @@
     - you would think this would abort if a prompt was issued, which is *technically* correct, but only for certain 
     defintions of 'prompt'
     - it will abort if *Fabric* issues the prompt, but not if *you* issue a command that requires a prompt
-        - for example:
+        - for example, this will **not** abort:
         
-
+```
     with settings(abort_on_prompt=True):
         local("read -p '> '")
-        
-    - will **not** abort
+```
 
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
