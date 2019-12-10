@@ -12,12 +12,24 @@ dev=${1:-""}
 if [ "$dev" = "dev" ]; then
     shift # pop the first arg off
     source venv/bin/activate
-    PYTHONPATH=threadbare/ python -m pytest \
-        tests/ \
-        -vv \
-        --cov=threadbare/ \
-        --cov-fail-under 77 \
-        "$@"
+    if [ -z "$@" ]; then
+        # no further args passed to test script
+        # run with coverage and reporting enabled
+        PYTHONPATH=threadbare/ python -m pytest \
+            tests/ \
+            -vv \
+            --cov=threadbare/ \
+            --cov-report html --cov-report term \
+            --cov-fail-under 75
+    else
+        # running tests adhoc, skip coverage reporting
+        PYTHONPATH=threadbare/ python -m pytest \
+            tests/ \
+            -vv \
+            --cov=threadbare/ \
+            --cov-report html --cov-report term \
+            "$@"
+    fi
 else
     tox --parallel auto "$@"
 fi
