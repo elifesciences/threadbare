@@ -15,7 +15,7 @@
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [x] implement 'timeout'
-- [ ] implement 'abort_on_prompts', bails when input on stdin is requested
+- [ ] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
 - [ ] output is being duplicated, once from logging, once from us. what does builder do?
@@ -34,8 +34,18 @@
 
 ## investigate:
 
-* `remote_file_exists` needs it's behaviour checked against what Fabric is doing
-    - it's causing bootstrap to fail/hang while polling for remote files
+* `abort_on_prompts=True`
+    - https://github.com/mathiasertl/fabric/blob/19c9f3fcf22e384fe2a6127ea9c268a3a4ff8a6b/fabric/network.py#L446
+    - you would think this would abort if a prompt was issued, which is *technically* correct, but only for certain 
+    defintions of 'prompt'
+    - it will abort if *Fabric* issues the prompt, but not if *you* issue a command that requires a prompt
+        - for example:
+        
+
+    with settings(abort_on_prompt=True):
+        local("read -p '> '")
+        
+    - will **not** abort
 
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
@@ -51,11 +61,13 @@
     - not used explicitly in builder
     - prints contents per-line rather than per-chunk-of-bytes
 
+
+## wontfix:
+
 * are we using upload/download on directories of files? 
     - because Fabric and pssh totally support that.
         - they're both using SFTP under the hood
-
-## wontfix:
+    - we're not. support for uploading/download directories is disabled
 
 * implement `disconnect_all` that closes all open client connections
     - client connections are closed automatically when the context is left
