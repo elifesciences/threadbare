@@ -94,6 +94,23 @@ def test_execute_with_bad_param_values():
             execute.execute(env, fn, param_key="mykey", param_values=bad_param_values)
 
 
+def test_execute_workerfn_exception():
+    "exceptions thrown by worker functions while being executed serially are left uncaught"
+    env = None
+    exc_msg = "omg. dead"
+
+    def workerfn():
+        raise EnvironmentError(exc_msg)
+
+    # what should the behaviour here be? consistent with `parallel`?
+    # in that case, the exception should be returned as a result.
+    # I think builder expects exceptions to be thrown rather than returned however.
+    with pytest.raises(EnvironmentError) as exc:
+        execute.execute(env, workerfn)
+        assert isinstance(exc, EnvironmentError)
+        assert str(exc) == exc_msg
+
+
 def test_execute_many_parallel():
     "`parallel` will wrap a given function and run it `pool_size` times in parallel. complements `serial`"
     env = None
@@ -201,6 +218,21 @@ def test_parallel_terminate():
 
     assert expected == actual_result
     assert results_q.empty()
+
+
+def test_parallel_worker_exceptions():
+    "exceptions in worker functions are returned as results"
+    env = None
+    exc_msg = "omg. dead"
+
+    @execute.parallel
+    def workerfn():
+        raise EnvironmentError(exc_msg)
+
+    results = execute.execute(env, workerfn)
+    unhandled_exception = results[0]
+    assert isinstance(unhandled_exception, EnvironmentError)
+    assert str(unhandled_exception) == exc_msg
 
 
 def test_execute_with_hosts():

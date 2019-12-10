@@ -517,7 +517,7 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
 
         if os.path.isdir(local_path):
             raise ValueError("folders cannot be uploaded")
-            
+
         if use_sudo:
             return _upload_as_root_hack(local_path, remote_path, **kwargs)
 

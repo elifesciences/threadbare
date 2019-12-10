@@ -56,6 +56,55 @@ def test_rcd():
     mockobj.assert_called_with(**expected_kwargs)
 
 
+def test__ssh_client():
+    "the SSHClient object factory is creating objects as expected"
+    with patch("threadbare.operations.SSHClient") as m:
+        operations._ssh_client(
+            user="joe",
+            host_string="localhost",
+            key_filename="/foo/bar/baz.pem",
+            port=123,
+        )
+
+    expected_initialised_with = {
+        "user": "joe",
+        "pkey": "/foo/bar/baz.pem",
+        "host": "localhost",
+        "port": 123,
+        "password": None,
+    }
+    m.assert_called_with(**expected_initialised_with)
+
+
+def test_stateful__ssh_client():
+    "the SSHClient object factory is creating objects (or not) as expected"
+    with state.settings():
+        with patch("threadbare.operations.SSHClient") as m1:
+            operations._ssh_client(
+                user="joe",
+                host_string="localhost",
+                key_filename="/foo/bar/baz.pem",
+                port=123,
+            )
+            expected_initialised_with = {
+                "user": "joe",
+                "pkey": "/foo/bar/baz.pem",
+                "host": "localhost",
+                "port": 123,
+                "password": None,
+            }
+            m1.assert_called_with(**expected_initialised_with)
+
+        with patch("threadbare.operations.SSHClient") as m2:
+            operations._ssh_client(
+                user="joe",
+                host_string="localhost",
+                key_filename="/foo/bar/baz.pem",
+                port=123,
+            )
+            m2.assert_not_called()
+
+
 def test_remote_args_to_execute():
     "`operations.remote` calls `operations._execute` with the correct arguments"
     with patch("threadbare.operations._execute") as mockobj:
