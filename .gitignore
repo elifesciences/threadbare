@@ -6,3 +6,5 @@
 venv/
 threadbare.egg-info/
 .tox/
+.coverage
+htmlcov/

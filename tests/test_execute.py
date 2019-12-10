@@ -1,6 +1,6 @@
 import pytest
 import time
-from threadbare import execute
+from threadbare import execute, state
 from threadbare.state import settings
 
 
@@ -92,6 +92,23 @@ def test_execute_with_bad_param_values():
     for bad_param_values in cases:
         with pytest.raises(ValueError):
             execute.execute(env, fn, param_key="mykey", param_values=bad_param_values)
+
+
+def test_execute_workerfn_exception():
+    "exceptions thrown by worker functions while being executed serially are left uncaught"
+    env = None
+    exc_msg = "omg. dead"
+
+    def workerfn():
+        raise EnvironmentError(exc_msg)
+
+    # what should the behaviour here be? consistent with `parallel`?
+    # in that case, the exception should be returned as a result.
+    # I think builder expects exceptions to be thrown rather than returned however.
+    with pytest.raises(EnvironmentError) as exc:
+        execute.execute(env, workerfn)
+        assert isinstance(exc, EnvironmentError)
+        assert str(exc) == exc_msg
 
 
 def test_execute_many_parallel():
@@ -201,3 +218,32 @@ def test_parallel_terminate():
 
     assert expected == actual_result
     assert results_q.empty()
+
+
+def test_parallel_worker_exceptions():
+    "exceptions in worker functions are returned as results"
+    env = None
+    exc_msg = "omg. dead"
+
+    @execute.parallel
+    def workerfn():
+        raise EnvironmentError(exc_msg)
+
+    results = execute.execute(env, workerfn)
+    unhandled_exception = results[0]
+    assert isinstance(unhandled_exception, EnvironmentError)
+    assert str(unhandled_exception) == exc_msg
+
+
+def test_execute_with_hosts():
+    "`execute_with_hosts` returns a dictionary of results keyed by host. like Fabric."
+
+    def workerfn():
+        with settings() as env:
+            return env["host_string"] + "host"
+
+    hosts = ["local", "good"]
+    env = state.ENV
+    results = execute.execute_with_hosts(env, workerfn, hosts)
+    expected = {"local": "localhost", "good": "goodhost"}
+    assert expected == results
