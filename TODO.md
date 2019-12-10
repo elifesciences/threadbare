@@ -42,7 +42,7 @@
         - for example, this will **not** abort:
         
 ```
-    with settings(abort_on_prompt=True):
+    with settings(abort_on_prompts=True):
         local("read -p '> '")
 ```
 
