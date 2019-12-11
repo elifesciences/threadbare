@@ -34,6 +34,9 @@
 
 ## investigate:
 
+* `quiet=True`
+    - this needs to apply to logging as well.
+
 * `remote_file_exists` needs it's behaviour checked against what Fabric is doing
     - it's causing bootstrap to fail/hang while polling for remote files
 

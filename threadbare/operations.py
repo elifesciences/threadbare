@@ -17,6 +17,11 @@ from .common import (
 )
 from pssh.clients.native import SSHClient as PSSHClient
 
+try:
+    from subprocess import DEVNULL  # py3
+except ImportError:
+    DEVNULL = open(os.devnull, "wb")
+
 
 class SSHClient(PSSHClient):
     def __deepcopy__(self, memo):
@@ -80,7 +85,6 @@ def lcd(local_dir):
 @contextlib.contextmanager
 def rcd(remote_working_dir):
     "ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run"
-    # TODO: this will cause a new ssh connection to be created
     with state.settings(remote_working_dir=remote_working_dir):
         yield
 
@@ -88,7 +92,6 @@ def rcd(remote_working_dir):
 @contextlib.contextmanager
 def hide(what=None):
     "hides *all* output, regardless of `what` type of output is to be hidden."
-    # TODO: this will cause a new ssh connection to be created
     with state.settings(quiet=True):
         yield
 
@@ -331,6 +334,7 @@ def local(command, **kwargs):
         "combine_stderr": True,
         "capture": False,
         "timeout": None,
+        "quiet": False,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -342,8 +346,15 @@ def local(command, **kwargs):
             out_stream = subprocess.PIPE
             err_stream = subprocess.PIPE
     else:
-        out_stream = None
-        err_stream = None
+        if final_kwargs["quiet"]:
+            # we're not capturing and we've been told to be quiet
+            # send everything to /dev/null
+            # py3 only: https://stackoverflow.com/questions/14735001/ignoring-output-from-subprocess-popen
+            out_stream = DEVNULL
+            err_stream = DEVNULL
+        else:
+            out_stream = None
+            err_stream = None
 
     if not final_kwargs["use_shell"] and not isinstance(command, list):
         raise ValueError("when shell=False, given command *must* be a list")
