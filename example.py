@@ -135,6 +135,16 @@ def test_run_a_remote_command_in_a_different_dir():
             assert result["succeeded"]
 
 
+def test_run_a_remote_command_but_hide_output():
+    "presumably for side effects"
+    with test_settings():
+        with hide():
+            result = remote("echo hi!")
+            # (nothing should have been emitted)
+            assert result["succeeded"]
+            assert result["stdout"] == ["hi!"]
+
+
 def test_run_a_remote_command_as_root():
     "run a simple remote command as root"
     with test_settings():

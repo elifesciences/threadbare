@@ -178,9 +178,8 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
 
 def _print_line(output_pipe, quiet, discard_output, line):
     """writes the given `line` (string) to the given `output_pipe` (file-like object)
-    if `quiet` is False, `line` is not written.
-    if `discard_output` is False, `line` is not returned.
-    `discard_output` should be set to `True` when you're expecting very large responses."""
+    if `quiet` is True, `line` is *not* written to `output_pipe`.
+    if `discard_output` is False, `line` is not returned and output is not accumulated in memory"""
     if not quiet:
         output_pipe.write(line + "\n")
     if not discard_output:
