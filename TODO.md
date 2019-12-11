@@ -18,7 +18,7 @@
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
 - [x] implement ssh session sharing so multiple commands can be run
-- [ ] output is being duplicated, once from logging, once from us. what does builder do?
+- [x] output is being duplicated, once from logging, once from us. what does builder do?
 - [x] separate development dependencies from required ones
 - [ ] test automation
 - [x] python 2 tests
@@ -34,8 +34,7 @@
 
 ## investigate:
 
-* `quiet=True`
-    - this needs to apply to logging as well.
+* with pssh logging disabled, ensure we have some means of prefixing output with IP addresses
 
 * `remote_file_exists` needs it's behaviour checked against what Fabric is doing
     - it's causing bootstrap to fail/hang while polling for remote files
