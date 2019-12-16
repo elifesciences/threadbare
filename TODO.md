@@ -15,8 +15,8 @@
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [x] implement 'timeout'
-- [ ] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
-- [ ] implement 'abort_exception', the exception to raise when execution is aborted
+- [x] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
+- [x] implement 'abort_exception', the exception to raise when execution is aborted
 - [ ] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
 - [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
