@@ -2,12 +2,12 @@ import tempfile
 import contextlib
 import subprocess
 from threading import Timer
-from threadbare import PromptedException
 import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from . import state
 from .common import (
+    PromptedException,
     merge,
     subdict,
     rename,

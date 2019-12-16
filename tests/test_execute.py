@@ -2,6 +2,7 @@ import pytest
 import time
 from threadbare import execute, state, operations
 from threadbare.state import settings
+from threadbare.common import PromptedException
 
 
 def test_parallel_wrapper():
@@ -280,15 +281,20 @@ def test_execute_with_hosts():
 
 
 def test_execute_with_prompts():
+    "prompts issued while executing a worker function in parallel return the PromptedException"
+
     @execute.parallel
     def workerfn():
         return operations.prompt("gimmie")
 
     results = execute.execute({}, workerfn)
-    expected = str(operations.PromptedException("prompted with: gimmie"))
+    expected = str(PromptedException("prompted with: gimmie"))
     assert expected == str(results[0])
 
+
 def test_execute_with_prompts_custom():
+    "prompts issued while executing a worker function in parallel with `abort_exception` return a custom exception"
+
     @execute.parallel
     def workerfn():
         return operations.prompt("gimmie")
@@ -297,4 +303,3 @@ def test_execute_with_prompts_custom():
         results = execute.execute({}, workerfn)
         expected = str(ValueError("prompted with: gimmie"))
         assert expected == str(results[0])
-    
