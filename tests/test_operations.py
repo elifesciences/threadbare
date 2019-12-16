@@ -407,3 +407,22 @@ def test_single_command():
     for given, expected in cases:
         actual = operations.single_command(given)
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
+
+
+def test_local_quiet_param():
+    "when quiet=True, nothing is sent to stdout or stderr"
+    cmd = lambda: operations.local(
+        'echo "hi!"; >&2 echo "hello!"', capture=False, combine_stderr=False
+    )
+    result = cmd()
+
+    # with `local` it's either captured or printed.
+    # if the results are empty it's because it was printed.
+    # but how do we test? sys.stdout/sys.stderr are bypassed ... this test needs improving somehow.
+    assert result["stdout"] == []
+    assert result["stderr"] == []
+
+    with operations.hide():
+        result = cmd()
+        assert result["stdout"] == []
+        assert result["stderr"] == []

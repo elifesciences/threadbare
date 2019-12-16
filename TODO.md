@@ -17,8 +17,9 @@
 - [x] implement 'timeout'
 - [ ] implement 'abort_on_prompts', bails when input on stdin is requested
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
+- [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
-- [ ] output is being duplicated, once from logging, once from us. what does builder do?
+- [x] output is being duplicated, once from logging, once from us. what does builder do?
 - [x] separate development dependencies from required ones
 - [ ] test automation
 - [x] python 2 tests
@@ -34,15 +35,10 @@
 
 ## investigate:
 
-* `remote_file_exists` needs it's behaviour checked against what Fabric is doing
-    - it's causing bootstrap to fail/hang while polling for remote files
+* with pssh logging disabled, ensure we have some means of prefixing output with IP addresses
 
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
-
-* pssh is emitting log lines:
-    - `INFO - pssh.host_logger - [34.201.187.7]	hello`
-    - for `./bldr cmd:observer--prod,'echo hello',concurrency=serial`
 
 * env `linewise`
     - used in `get`
@@ -50,10 +46,6 @@
         - I guess this would be useful to force if multiple processes are writing to your stdout?
     - not used explicitly in builder
     - prints contents per-line rather than per-chunk-of-bytes
-
-* are we using upload/download on directories of files? 
-    - because Fabric and pssh totally support that.
-        - they're both using SFTP under the hood
 
 ## wontfix:
 
