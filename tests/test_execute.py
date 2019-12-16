@@ -303,3 +303,20 @@ def test_execute_with_prompts_custom():
         results = execute.execute({}, workerfn)
         expected = str(ValueError("prompted with: gimmie"))
         assert expected == str(results[0])
+
+
+def test_execute_with_prompts_override():
+    """prompts issued while executing a worker function in parallel that has set 
+    their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised"""
+
+    @execute.parallel
+    def workerfn():
+        with settings(abort_on_prompts=False):
+            return operations.prompt("gimmie")
+
+    results = execute.execute({}, workerfn)
+
+    # this is what Python will give you
+    expected = EOFError("EOF when reading a line")
+
+    assert str(expected) == str(results[0])

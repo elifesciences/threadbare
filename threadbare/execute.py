@@ -39,7 +39,7 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         state.ENV = state.init_state()
         state.read_write(state.ENV)
         state.ENV.update(env or {})
-        # not possible to service stdin when multiprocessing
+        # note: not possible to service stdin when multiprocessing
         state.ENV["abort_on_prompts"] = True
         result = worker_func()
         queue.put({"name": name, "result": result})
