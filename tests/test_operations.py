@@ -8,7 +8,7 @@ except ImportError:
     from mock import patch
 
 from threadbare import operations, state
-from threadbare.common import merge, cwd
+from threadbare.common import merge, cwd, PromptedException
 from pssh import exceptions as pssh_exceptions
 
 # remote
@@ -426,3 +426,17 @@ def test_local_quiet_param():
         result = cmd()
         assert result["stdout"] == []
         assert result["stderr"] == []
+
+
+def test_prompt_operation_aborted():
+    "calling `prompt` for user input with `abort_on_prompts=True` set raises an exception"
+    with state.settings(abort_on_prompts=True):
+        with pytest.raises(PromptedException):
+            operations.prompt("some message")
+
+
+def test_prompt_operation_aborted_custom_exception():
+    "calling `prompt` for user input with `abort_on_prompts=True` and `abort_exception` set raises a custom exception"
+    with state.settings(abort_on_prompts=True, abort_exception=ValueError):
+        with pytest.raises(ValueError):
+            operations.prompt("some message")

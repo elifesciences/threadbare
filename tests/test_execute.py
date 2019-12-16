@@ -1,7 +1,8 @@
 import pytest
 import time
-from threadbare import execute, state
+from threadbare import execute, state, operations
 from threadbare.state import settings
+from threadbare.common import PromptedException
 
 
 def test_parallel_wrapper():
@@ -132,9 +133,24 @@ def test_execute_many_parallel_with_params():
     param_values = [1, 2, 3]
 
     expected = [
-        {"parallel": True, "parent": "environment", "mykey": 1},
-        {"parallel": True, "parent": "environment", "mykey": 2},
-        {"parallel": True, "parent": "environment", "mykey": 3},
+        {
+            "parallel": True,
+            "abort_on_prompts": True,
+            "parent": "environment",
+            "mykey": 1,
+        },
+        {
+            "parallel": True,
+            "abort_on_prompts": True,
+            "parent": "environment",
+            "mykey": 2,
+        },
+        {
+            "parallel": True,
+            "abort_on_prompts": True,
+            "parent": "environment",
+            "mykey": 3,
+        },
     ]
 
     with settings(parent="environment") as env:
@@ -159,7 +175,12 @@ def test_execute_many_parallel_raw_results():
             "alive": False,
             "killed": False,
             "kill-signal": None,
-            "result": {"parallel": True, "parent": "environment", "mykey": 1},
+            "result": {
+                "parallel": True,
+                "abort_on_prompts": True,
+                "parent": "environment",
+                "mykey": 1,
+            },
         },
         {
             "name": "process--2",
@@ -167,7 +188,12 @@ def test_execute_many_parallel_raw_results():
             "alive": False,
             "killed": False,
             "kill-signal": None,
-            "result": {"parallel": True, "parent": "environment", "mykey": 2},
+            "result": {
+                "parallel": True,
+                "abort_on_prompts": True,
+                "parent": "environment",
+                "mykey": 2,
+            },
         },
         {
             "name": "process--3",
@@ -175,7 +201,12 @@ def test_execute_many_parallel_raw_results():
             "alive": False,
             "killed": False,
             "kill-signal": None,
-            "result": {"parallel": True, "parent": "environment", "mykey": 3},
+            "result": {
+                "parallel": True,
+                "abort_on_prompts": True,
+                "parent": "environment",
+                "mykey": 3,
+            },
         },
     ]
     result_list = execute._parallel_execution(env, parallel_fn, param_key, param_values)
@@ -247,3 +278,45 @@ def test_execute_with_hosts():
     results = execute.execute_with_hosts(env, workerfn, hosts)
     expected = {"local": "localhost", "good": "goodhost"}
     assert expected == results
+
+
+def test_execute_with_prompts():
+    "prompts issued while executing a worker function in parallel return the PromptedException"
+
+    @execute.parallel
+    def workerfn():
+        return operations.prompt("gimmie")
+
+    results = execute.execute({}, workerfn)
+    expected = str(PromptedException("prompted with: gimmie"))
+    assert expected == str(results[0])
+
+
+def test_execute_with_prompts_custom():
+    "prompts issued while executing a worker function in parallel with `abort_exception` return a custom exception"
+
+    @execute.parallel
+    def workerfn():
+        return operations.prompt("gimmie")
+
+    with settings(abort_exception=ValueError):
+        results = execute.execute({}, workerfn)
+        expected = str(ValueError("prompted with: gimmie"))
+        assert expected == str(results[0])
+
+
+def test_execute_with_prompts_override():
+    """prompts issued while executing a worker function in parallel that has set 
+    their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised"""
+
+    @execute.parallel
+    def workerfn():
+        with settings(abort_on_prompts=False):
+            return operations.prompt("gimmie")
+
+    results = execute.execute({}, workerfn)
+
+    # this is what Python will give you
+    expected = EOFError("EOF when reading a line")
+
+    assert str(expected) == str(results[0])

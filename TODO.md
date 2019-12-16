@@ -15,8 +15,9 @@
 - [x] implement `rcd`
 - [x] use the `hosts` in the environment to determine `param_key` and `param_values` parameters to `execute`
 - [x] implement 'timeout'
-- [ ] implement 'abort_on_prompts', bails when input on stdin is requested
+- [ ] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
+- [ ] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
 - [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
 - [x] output is being duplicated, once from logging, once from us. what does builder do?
@@ -37,6 +38,18 @@
 
 * with pssh logging disabled, ensure we have some means of prefixing output with IP addresses
 
+* `abort_on_prompts=True`
+    - https://github.com/mathiasertl/fabric/blob/19c9f3fcf22e384fe2a6127ea9c268a3a4ff8a6b/fabric/network.py#L446
+    - you would think this would abort if a prompt was issued, which is *technically* correct, but only for certain 
+    defintions of 'prompt'
+    - it will abort if *Fabric* issues the prompt, but not if *you* issue a command that requires a prompt
+        - for example, this will **not** abort:
+        
+```
+    with settings(abort_on_prompts=True):
+        local("read -p '> '")
+```
+
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
 
@@ -47,7 +60,12 @@
     - not used explicitly in builder
     - prints contents per-line rather than per-chunk-of-bytes
 
+
 ## wontfix:
+
+* are we using upload/download on directories of files? 
+    - because Fabric and pssh totally support that.
+        - they're both using SFTP under the hood
 
 * implement `disconnect_all` that closes all open client connections
     - client connections are closed automatically when the context is left
