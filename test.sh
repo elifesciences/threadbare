@@ -28,7 +28,7 @@ if [ "$dev" = "dev" ]; then
             -vv \
             --cov=threadbare/ \
             --cov-report html --cov-report term \
-            "$@"
+            -k "$@"
     fi
 else
     tox --parallel auto "$@"

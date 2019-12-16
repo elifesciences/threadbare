@@ -14,6 +14,7 @@ from threadbare.operations import (
     single_command,
     lcd,
     rcd,
+    hide,
 )
 import logging
 
@@ -64,6 +65,17 @@ def test_run_a_local_command_in_a_different_dir():
     with lcd("/tmp"):
         result = local("pwd", capture=True)
         assert result["succeeded"]
+        assert result["stdout"] == ["/tmp"]
+
+
+def test_run_a_local_command_but_hide_output():
+    "presumably for side effects"
+    with hide():
+        result = local("cat /etc/passwd", capture=False)
+        # (nothing should be emitted)
+        assert result["succeeded"]
+        assert result["stdout"] == []
+        assert result["stderr"] == []
 
 
 def test_run_many_local_commands_serially():
@@ -121,6 +133,16 @@ def test_run_a_remote_command_in_a_different_dir():
         with rcd("/tmp"):
             result = remote("pwd")
             assert result["succeeded"]
+
+
+def test_run_a_remote_command_but_hide_output():
+    "presumably for side effects"
+    with test_settings():
+        with hide():
+            result = remote("echo hi!")
+            # (nothing should have been emitted)
+            assert result["succeeded"]
+            assert result["stdout"] == ["hi!"]
 
 
 def test_run_a_remote_command_as_root():

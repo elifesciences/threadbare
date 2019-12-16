@@ -17,8 +17,9 @@
 - [x] implement 'timeout'
 - [ ] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
+- [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
-- [ ] output is being duplicated, once from logging, once from us. what does builder do?
+- [x] output is being duplicated, once from logging, once from us. what does builder do?
 - [x] separate development dependencies from required ones
 - [ ] test automation
 - [x] python 2 tests
@@ -33,6 +34,8 @@
 - [ ] move taskrunner from builder into threadbare, including tests
 
 ## investigate:
+
+* with pssh logging disabled, ensure we have some means of prefixing output with IP addresses
 
 * `abort_on_prompts=True`
     - https://github.com/mathiasertl/fabric/blob/19c9f3fcf22e384fe2a6127ea9c268a3a4ff8a6b/fabric/network.py#L446
@@ -49,10 +52,6 @@
 * SFTP (default for pssh and fabric) is excruciatingly slow
     - can we safely switch to SCP?
 
-* pssh is emitting log lines:
-    - `INFO - pssh.host_logger - [34.201.187.7]	hello`
-    - for `./bldr cmd:observer--prod,'echo hello',concurrency=serial`
-
 * env `linewise`
     - used in `get`
     - used in `_execute` with parallel worker functions as well
@@ -66,7 +65,6 @@
 * are we using upload/download on directories of files? 
     - because Fabric and pssh totally support that.
         - they're both using SFTP under the hood
-    - we're not. support for uploading/download directories is disabled
 
 * implement `disconnect_all` that closes all open client connections
     - client connections are closed automatically when the context is left

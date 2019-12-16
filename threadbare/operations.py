@@ -81,7 +81,6 @@ def lcd(local_dir):
 @contextlib.contextmanager
 def rcd(remote_working_dir):
     "ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run"
-    # TODO: this will cause a new ssh connection to be created
     with state.settings(remote_working_dir=remote_working_dir):
         yield
 
@@ -89,7 +88,6 @@ def rcd(remote_working_dir):
 @contextlib.contextmanager
 def hide(what=None):
     "hides *all* output, regardless of `what` type of output is to be hidden."
-    # TODO: this will cause a new ssh connection to be created
     with state.settings(quiet=True):
         yield
 
@@ -176,9 +174,8 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
 
 def _print_line(output_pipe, quiet, discard_output, line):
     """writes the given `line` (string) to the given `output_pipe` (file-like object)
-    if `quiet` is False, `line` is not written.
-    if `discard_output` is False, `line` is not returned.
-    `discard_output` should be set to `True` when you're expecting very large responses."""
+    if `quiet` is True, `line` is *not* written to `output_pipe`.
+    if `discard_output` is True, `line` is not returned and output is not accumulated in memory"""
     if not quiet:
         output_pipe.write(line + "\n")
     if not discard_output:
@@ -332,8 +329,17 @@ def local(command, **kwargs):
         "combine_stderr": True,
         "capture": False,
         "timeout": None,
+        "quiet": False,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # TODO: once py2 support has been dropped, move this back to file head
+    devnull_opened = False
+    try:
+        from subprocess import DEVNULL  # py3
+    except ImportError:
+        devnull_opened = True
+        DEVNULL = open(os.devnull, "wb")
 
     if final_kwargs["capture"]:
         if final_kwargs["combine_stderr"]:
@@ -343,8 +349,14 @@ def local(command, **kwargs):
             out_stream = subprocess.PIPE
             err_stream = subprocess.PIPE
     else:
-        out_stream = None
-        err_stream = None
+        if final_kwargs["quiet"]:
+            # we're not capturing and we've been told to be quiet
+            # send everything to /dev/null
+            out_stream = DEVNULL
+            err_stream = DEVNULL
+        else:
+            out_stream = None
+            err_stream = None
 
     if not final_kwargs["use_shell"] and not isinstance(command, list):
         raise ValueError("when shell=False, given command *must* be a list")
@@ -366,7 +378,7 @@ def local(command, **kwargs):
         stdout, stderr = proc.communicate()
 
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1240-L1244
-    return {
+    result = {
         "return_code": proc.returncode,
         "failed": proc.returncode != 0,
         "succeeded": proc.returncode == 0,
@@ -374,6 +386,11 @@ def local(command, **kwargs):
         "stdout": (stdout or b"").decode("utf-8").splitlines(),
         "stderr": (stderr or b"").decode("utf-8").splitlines(),
     }
+
+    if devnull_opened:
+        DEVNULL.close()
+
+    return result
 
 
 def single_command(cmd_list):
