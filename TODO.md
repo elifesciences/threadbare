@@ -17,6 +17,7 @@
 - [x] implement 'timeout'
 - [ ] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [ ] implement 'abort_exception', the exception to raise when execution is aborted
+- [ ] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
 - [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
 - [x] output is being duplicated, once from logging, once from us. what does builder do?
