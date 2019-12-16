@@ -6,6 +6,11 @@ from gevent import monkey
 
 monkey.patch_all()
 
+
+class PromptedException(BaseException):
+    pass
+
+
 from . import state, operations, execute
 
 assert state and operations and execute  # quieten pyflakes

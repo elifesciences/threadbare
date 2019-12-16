@@ -407,3 +407,15 @@ def test_single_command():
     for given, expected in cases:
         actual = operations.single_command(given)
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
+
+
+def test_prompt_operation_aborted():
+    with state.settings(abort_on_prompts=True):
+        with pytest.raises(operations.PromptedException):
+            operations.prompt("some message")
+
+
+def test_prompt_operation_aborted_custom_exception():
+    with state.settings(abort_on_prompts=True, abort_exception=ValueError):
+        with pytest.raises(ValueError):
+            operations.prompt("some message")

@@ -2,6 +2,7 @@ import tempfile
 import contextlib
 import subprocess
 from threading import Timer
+from threadbare import PromptedException
 import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
@@ -381,6 +382,21 @@ def single_command(cmd_list):
     if cmd_list in [None, []]:
         return None
     return " && ".join(map(str, cmd_list))
+
+
+def prompt(msg):
+    """issues a prompt for input. 
+    raises a PromptedException if `abort_on_prompts` in `state.ENV` is `True` or executing within 
+    another process using `execute.parallel` where input can't be supplied.
+    if `abort_exception` is set in `state.ENV`, then that exception is raised instead"""
+    if state.ENV.get("abort_on_prompts", False):
+        abort_ex = state.ENV.get("abort_exception", PromptedException)
+        raise abort_ex("prompted with: %s" % (msg,))
+    print(msg)
+    try:
+        return raw_input("> ")
+    except NameError:
+        return input("> ")
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
