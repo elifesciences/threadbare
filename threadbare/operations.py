@@ -212,10 +212,10 @@ def remote(command, **kwargs):
     # pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
     # combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
     # quiet=False, # done
-    # warn_only=False # ignore
+    # warn_only=False # done
     # stdout=None # done, stdout/stderr always available unless explicitly discarded. 'see discard_output'
     # stderr=None # done, stderr not available when combine_stderr is `True`
-    # timeout=None # todo
+    # timeout=None # done
     # shell_escape=None # ignored. shell commands are always escaped
     # capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
 
