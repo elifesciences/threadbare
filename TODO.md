@@ -17,6 +17,7 @@
 - [x] implement 'timeout'
 - [x] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [x] implement 'abort_exception', the exception to raise when execution is aborted
+- [ ] implement some kind of 'initial_settings' hook for apps to set their own defaults
 - [ ] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
 - [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
