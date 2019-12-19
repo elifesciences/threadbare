@@ -399,6 +399,47 @@ def test_local_command_non_zero_exit():
     assert expected_err_payload == exc.result
 
 
+def test_local_command_non_zero_custom_exit():
+    "local commands may raise a specific exception if the command they execute exits with a non-zero result"
+    with pytest.raises(ValueError) as err:
+        operations.local("exit 1", abort_exception=ValueError)
+    exc = err.value
+
+    expected_err_msg = "local() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
+    assert expected_err_msg == str(exc)
+
+    expected_err_payload = {
+        "command": '/bin/bash -l -c "exit 1"',
+        "failed": True,
+        "return_code": 1,
+        "stderr": [],
+        "stdout": [],
+        "succeeded": False,
+    }
+    assert expected_err_payload == exc.result
+
+
+def test_local_command_non_zero_exit_swallowed():
+    "local commands that exit with a non-zero result do not raise an exception if `warn_only` is `True`"
+    expected_result = {
+        "command": '/bin/bash -l -c "exit 1"',
+        "failed": True,
+        "return_code": 1,
+        "stderr": [],
+        "stdout": [],
+        "succeeded": False,
+    }
+    command = "exit 1"
+
+    with state.settings(warn_only=True):
+        result = operations.local(command)
+        assert expected_result == result
+
+    # ... and again, but as a parameter
+    result = operations.local(command, warn_only=True)
+    assert expected_result == result
+
+
 def test_local_command_timeout():
     "local commands can be killed if their execution exceeds a timeout threshold"
     command = "sleep 5"

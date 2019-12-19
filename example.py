@@ -1,3 +1,4 @@
+import pytest
 import os
 from functools import partial
 from io import BytesIO
@@ -164,7 +165,32 @@ def test_run_a_remote_command_with_separate_streams():
 
 
 def test_run_a_remote_command_non_zero_return_code():
+    """remote commands, like local commands, will raise a RuntimeError if the command they execute fails.
+    the results of the command are still available via the `result` attribute on the exception object"""
     with test_settings():
+        with pytest.raises(RuntimeError) as err:
+            remote("exit 123")
+        exc = err.value
+        assert exc.result["return_code"] == 123
+        assert exc.result["failed"]
+        assert not exc.result["succeeded"]
+
+
+def test_run_a_remote_command_non_zero_custom_exit():
+    """remote commands, like local commands, may raise a custom exception if the command they execute fails.
+    the results of the command are still available via the `result` attribute on the exception object"""
+    with test_settings():
+        with pytest.raises(ValueError) as err:
+            remote("exit 123", abort_exception=ValueError)
+        exc = err.value
+        assert exc.result["return_code"] == 123
+        assert exc.result["failed"]
+        assert not exc.result["succeeded"]
+
+
+def test_run_a_remote_command_non_zero_return_code_swallow_error():
+    "remote commands, like local commands, can return the results of failed executions by passing the `warn_only=True` option"
+    with test_settings(warn_only=True):
         result = remote("exit 123")
         assert result["return_code"] == 123
         assert result["failed"]
