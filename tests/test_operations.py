@@ -379,6 +379,26 @@ def test_local_command_split_stderr():
     assert expected == actual
 
 
+def test_local_command_non_zero_exit():
+    "local commands raise a generic exception if the command they execute exits with a non-zero result"
+    with pytest.raises(RuntimeError) as err:
+        operations.local("exit 1")
+    exc = err.value
+
+    expected_err_msg = "local() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
+    assert expected_err_msg == str(exc)
+
+    expected_err_payload = {
+        "command": '/bin/bash -l -c "exit 1"',
+        "failed": True,
+        "return_code": 1,
+        "stderr": [],
+        "stdout": [],
+        "succeeded": False,
+    }
+    assert expected_err_payload == exc.result
+
+
 def test_local_command_timeout():
     "local commands can be killed if their execution exceeds a timeout threshold"
     command = "sleep 5"
@@ -390,7 +410,7 @@ def test_local_command_timeout():
         "stdout": [],
         "stderr": [],
     }
-    actual = operations.local(command, capture=True, timeout=0.1)
+    actual = operations.local(command, capture=True, timeout=0.1, warn_only=True)
     assert expected == actual
 
 

@@ -17,6 +17,9 @@ from .common import (
     shell_wrap_command,
 )
 from pssh.clients.native import SSHClient as PSSHClient
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 class SSHClient(PSSHClient):
@@ -330,6 +333,8 @@ def local(command, **kwargs):
         "capture": False,
         "timeout": None,
         "quiet": False,
+        "warn_only": False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        "abort_exception": RuntimeError,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -390,7 +395,23 @@ def local(command, **kwargs):
     if devnull_opened:
         DEVNULL.close()
 
-    return result
+    if result["succeeded"]:
+        return result
+
+    err_msg = "local() encountered an error (return code %s) while executing %r" % (
+        result["return_code"],
+        command,
+    )
+
+    if final_kwargs["warn_only"]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs["abort_exception"]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, "result", result)
+
+    raise exc
 
 
 def single_command(cmd_list):
