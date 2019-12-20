@@ -1,6 +1,6 @@
 import pytest
 import time
-from threadbare import execute, state, operations
+from threadbare import execute, operations
 from threadbare.state import settings
 from threadbare.common import PromptedException
 
@@ -21,27 +21,24 @@ def test_parallel_wrapper():
 
 def test_execute_serial():
     "`execute` will call a regular function and return a list of results"
-    env = None
 
     def fn():
         return "hello, world"
 
     expected = ["hello, world"]
-    assert expected == execute.execute(env, fn)
+    assert expected == execute.execute(fn)
 
 
 def test_execute_many_serial():
     "`serial` will wrap a given function and run it `pool_size` times, one after the other. complements `parallel`"
-    env = None
     pool_size = 3
     wrapped_fn = execute.serial(lambda: "foo", pool_size)
     expected = ["foo", "foo", "foo"]
-    assert expected == execute.execute(env, wrapped_fn)
+    assert expected == execute.execute(wrapped_fn)
 
 
 def test_execute_many_serial_with_params():
     "`serial` will wrap a given function and run it `pool_size` times, but is ignored when `execute` is given a list of values"
-    env = None
 
     def fn():
         with settings() as local_env:
@@ -52,7 +49,7 @@ def test_execute_many_serial_with_params():
     param_values = ["bar", "baz", "bop"]
 
     expected = ["foobar", "foobaz", "foobop"]
-    assert expected == execute.execute(env, wrapped_fn, param_key, param_values)
+    assert expected == execute.execute(wrapped_fn, param_key, param_values)
 
 
 def test_execute_with_missing():
@@ -61,12 +58,11 @@ def test_execute_with_missing():
     def fn():
         return
 
-    env = None
     with pytest.raises(ValueError):
-        execute.execute(env, fn, param_key="good_key", param_values=None)
+        execute.execute(fn, param_key="good_key", param_values=None)
 
     with pytest.raises(ValueError):
-        execute.execute(env, fn, param_values=["good", "values"])
+        execute.execute(fn, param_values=["good", "values"])
 
 
 def test_execute_with_bad_param_key():
@@ -75,11 +71,10 @@ def test_execute_with_bad_param_key():
     def fn():
         return
 
-    env = None
     cases = [None, [], {}, (), 1, lambda x: x]
     for bad_param_key in cases:
         with pytest.raises(ValueError):
-            execute.execute(env, fn, param_key=bad_param_key, param_values=["foo"])
+            execute.execute(fn, param_key=bad_param_key, param_values=["foo"])
 
 
 def test_execute_with_bad_param_values():
@@ -88,16 +83,14 @@ def test_execute_with_bad_param_values():
     def fn():
         return
 
-    env = None
     cases = [None, 1, "", {}, lambda x: x]
     for bad_param_values in cases:
         with pytest.raises(ValueError):
-            execute.execute(env, fn, param_key="mykey", param_values=bad_param_values)
+            execute.execute(fn, param_key="mykey", param_values=bad_param_values)
 
 
 def test_execute_workerfn_exception():
     "exceptions thrown by worker functions while being executed serially are left uncaught"
-    env = None
     exc_msg = "omg. dead"
 
     def workerfn():
@@ -107,18 +100,17 @@ def test_execute_workerfn_exception():
     # in that case, the exception should be returned as a result.
     # I think builder expects exceptions to be thrown rather than returned however.
     with pytest.raises(EnvironmentError) as exc:
-        execute.execute(env, workerfn)
+        execute.execute(workerfn)
         assert isinstance(exc, EnvironmentError)
         assert str(exc) == exc_msg
 
 
 def test_execute_many_parallel():
     "`parallel` will wrap a given function and run it `pool_size` times in parallel. complements `serial`"
-    env = None
     pool_size = 3
     parallel_fn = execute.parallel(lambda: "foo", pool_size)
     expected = ["foo", "foo", "foo"]
-    assert expected == execute.execute(env, parallel_fn)
+    assert expected == execute.execute(parallel_fn)
 
 
 def test_execute_many_parallel_with_params():
@@ -153,8 +145,8 @@ def test_execute_many_parallel_with_params():
         },
     ]
 
-    with settings(parent="environment") as env:
-        assert expected == execute.execute(env, parallel_fn, param_key, param_values)
+    with settings(parent="environment"):
+        assert expected == execute.execute(parallel_fn, param_key, param_values)
 
 
 def test_execute_many_parallel_raw_results():
@@ -253,14 +245,13 @@ def test_parallel_terminate():
 
 def test_parallel_worker_exceptions():
     "exceptions in worker functions are returned as results"
-    env = None
     exc_msg = "omg. dead"
 
     @execute.parallel
     def workerfn():
         raise EnvironmentError(exc_msg)
 
-    results = execute.execute(env, workerfn)
+    results = execute.execute(workerfn)
     unhandled_exception = results[0]
     assert isinstance(unhandled_exception, EnvironmentError)
     assert str(unhandled_exception) == exc_msg
@@ -274,8 +265,7 @@ def test_execute_with_hosts():
             return env["host_string"] + "host"
 
     hosts = ["local", "good"]
-    env = state.ENV
-    results = execute.execute_with_hosts(env, workerfn, hosts)
+    results = execute.execute_with_hosts(workerfn, hosts)
     expected = {"local": "localhost", "good": "goodhost"}
     assert expected == results
 
@@ -287,7 +277,7 @@ def test_execute_with_prompts():
     def workerfn():
         return operations.prompt("gimmie")
 
-    results = execute.execute({}, workerfn)
+    results = execute.execute(workerfn)
     expected = str(PromptedException("prompted with: gimmie"))
     assert expected == str(results[0])
 
@@ -300,7 +290,7 @@ def test_execute_with_prompts_custom():
         return operations.prompt("gimmie")
 
     with settings(abort_exception=ValueError):
-        results = execute.execute({}, workerfn)
+        results = execute.execute(workerfn)
         expected = str(ValueError("prompted with: gimmie"))
         assert expected == str(results[0])
 
@@ -314,7 +304,7 @@ def test_execute_with_prompts_override():
         with settings(abort_on_prompts=False):
             return operations.prompt("gimmie")
 
-    results = execute.execute({}, workerfn)
+    results = execute.execute(workerfn)
 
     # this is what Python will give you
     expected = EOFError("EOF when reading a line")

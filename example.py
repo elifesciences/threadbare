@@ -91,9 +91,7 @@ def test_run_many_local_commands_serially():
     def myfn():
         return local(state.ENV["cmd"], capture=True)
 
-    results = execute.execute(
-        state.ENV, myfn, param_key="cmd", param_values=command_list
-    )
+    results = execute.execute(myfn, param_key="cmd", param_values=command_list)
     assert len(results) == len(command_list)
     assert results[-2]["stdout"][0] == "are executed"
 
@@ -111,9 +109,7 @@ def test_run_many_local_commands_in_parallel():
     def myfn():
         return local(state.ENV["cmd"], capture=True)
 
-    results = execute.execute(
-        state.ENV, myfn, param_key="cmd", param_values=command_list
-    )
+    results = execute.execute(myfn, param_key="cmd", param_values=command_list)
     assert len(results) == len(command_list)
     assert results[-2]["stdout"][0] == "are executed"
 
@@ -247,9 +243,7 @@ def test_run_many_remote_commands_serially():
         return remote(state.ENV["cmd"], capture=True)
 
     with test_settings():
-        results = execute.execute(
-            state.ENV, myfn, param_key="cmd", param_values=command_list
-        )
+        results = execute.execute(myfn, param_key="cmd", param_values=command_list)
         assert len(results) == len(command_list)
         assert results[-2]["stdout"][0] == "are executed"
 
@@ -270,9 +264,7 @@ def test_run_many_remote_commands_in_parallel():
         return remote(state.ENV["cmd"], capture=True)
 
     with test_settings(quiet=True):
-        results = execute.execute(
-            state.ENV, myfn, param_key="cmd", param_values=command_list
-        )
+        results = execute.execute(myfn, param_key="cmd", param_values=command_list)
         assert len(results) == len(command_list)
         assert results[-2]["stdout"][0] == "are executed"
 
@@ -479,7 +471,7 @@ def test_check_many_remote_files():
 
         expected = [True, False]
         result = execute.execute(
-            state.ENV, workerfn, param_key="remote_file", param_values=remote_file_list
+            workerfn, param_key="remote_file", param_values=remote_file_list
         )
         assert expected == result
 
