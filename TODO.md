@@ -18,8 +18,8 @@
 - [x] implement 'abort_on_prompts', bails when ~input on stdin is requested~ *Fabric* issues a prompt
 - [x] implement 'abort_exception', the exception to raise when execution is aborted
 - [ ] implement some kind of 'initial_settings' hook for apps to set their own defaults
-- [ ] remove local scope support in 'settings' - it's unused and makes a complicated thing more so
-- [ ] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
+- [x] remove local scope support in 'settings' - it's unused and makes a complicated thing more so
+- [x] implement 'warn_only', "warn, instead of abort, when commands fail", used in masterless when updating repos
 - [x] implement `quiet=True` in `local` and `remote`
 - [x] implement ssh session sharing so multiple commands can be run
 - [x] output is being duplicated, once from logging, once from us. what does builder do?

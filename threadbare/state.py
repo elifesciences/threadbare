@@ -19,10 +19,11 @@ class LockableDict(dict):
     def __setitem__(self, key, val):
         # I suspect multiprocessing isn't copying the custom 'read_only' attribute back
         # from the child process results. be aware of this weirdness
-        # print("self:",self.__dict__, "data:",self)
+        # print("self:", self.__dict__, "internal data:", self)
         if hasattr(self, "read_only") and self.read_only:
             raise ValueError(
-                "dictionary is locked attempting to `set` %r with %r" % (key, val)
+                "dictionary is locked attempting to `__setitem__` %r with %r"
+                % (key, val)
             )
         dict.__setitem__(self, key, val)
 
@@ -38,6 +39,9 @@ def read_write(d):
 
 
 def init_state():
+    "returns a new, empty, locked, LockableDict instance that is used as the initial `state.ENV` value"
+    # if you are thinking, "it would be really convenient if 'some_setting' was 'some_value' by default,
+    # see `set_defaults`.
     new_env = LockableDict()
     read_only(new_env)
     return new_env
@@ -45,8 +49,23 @@ def init_state():
 
 ENV = init_state()
 
-# used to determine how deeply nested we are
-DEPTH = 0
+DEPTH = 0  # used to determine how deeply nested we are
+
+
+def set_defaults(defaults_dict=None, ignore_depth=False):
+    """re-initialises the `state.ENV` dictionary with the given defaults.
+    with no arguments, the global state will be reverted to it's initial state (an empty LockableDict).
+
+    use `state.set_defaults` BEFORE using ANY other `state.*` functions are called."""
+    global ENV, DEPTH
+    if DEPTH != 0 and not ignore_depth:
+        msg = "refusing to set initial `threadbare.state.ENV` state within a `threadbare.state.settings` context manager."
+        raise EnvironmentError(msg)
+
+    new_env = LockableDict()
+    new_env.update(defaults_dict or {})
+    read_only(new_env)
+    ENV = new_env
 
 
 def cleanup(old_state):
@@ -82,10 +101,13 @@ def settings(**kwargs):
     # the SSHClient is one such unserialisable object that has had to be subclassed
     # another approach would be to relax guarantees that the environment is completely reverted
 
+    # call read_write here, as `deepcopy` copies across attributes (like 'read_only') and values
+    # using `__setitem__`, causing errors in LockableDict
+    read_write(state)
+
     original_values = copy.deepcopy(state)
     DEPTH += 1
 
-    read_write(state)
     state.update(kwargs)
 
     # ensure child context processors don't clean up their parents
