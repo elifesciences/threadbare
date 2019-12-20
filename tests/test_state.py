@@ -11,10 +11,11 @@ import copy
 # inverse is also true. a subsequent test may end up relying on the successful modification in previous test
 def reset(fn):
     def wrapper():
-        result = fn()
-        state.ENV = state.LockableDict()
-        state.read_only(state.ENV)
-        return result
+        try:
+            result = fn()
+            return result
+        finally:
+            state.ENV = state.initial_state()
 
     return wrapper
 
@@ -170,6 +171,7 @@ def test_cleanup():
     assert side_effects["?"] == "!"
 
 
+@reset
 def test_nested_scopes_dont_cleanup_parent_scopes():
     "cleanup functions are only called for the scope they were added to"
     side_effects = {}
@@ -186,3 +188,29 @@ def test_nested_scopes_dont_cleanup_parent_scopes():
             state.add_cleanup(cleanup_fn_2)
         assert side_effects == {"2": "scope 2 cleaned up"}
     assert side_effects == {"2": "scope 2 cleaned up", "1": "scope 1 cleaned up"}
+
+
+@reset
+def test_set_defaults():
+    "global state defaults can be easily set"
+    expected_initial_state = state.initial_state()
+    assert state.ENV == expected_initial_state
+    assert state.ENV.read_only
+
+    state.set_defaults({"foo": "bar"})
+    assert state.DEPTH == 0
+
+    expected_state = state.LockableDict({"foo": "bar"})
+    assert state.ENV == expected_state
+    assert isinstance(state.ENV, state.LockableDict)
+    assert state.ENV.read_only
+
+
+@reset
+def test_set_defaults_settings():
+    "global state defaults can be easily set"
+    state.set_defaults({"foo": "bar"})
+    with state.settings(foo="baz"):
+        assert state.ENV == {"foo": "baz"}
+    assert state.ENV == {"foo": "bar"}
+    assert state.DEPTH == 0
