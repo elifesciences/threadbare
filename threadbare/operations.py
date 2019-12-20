@@ -17,6 +17,9 @@ from .common import (
     shell_wrap_command,
 )
 from pssh.clients.native import SSHClient as PSSHClient
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 class SSHClient(PSSHClient):
@@ -209,10 +212,10 @@ def remote(command, **kwargs):
     # pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
     # combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
     # quiet=False, # done
-    # warn_only=False # ignore
+    # warn_only=False # done
     # stdout=None # done, stdout/stderr always available unless explicitly discarded. 'see discard_output'
     # stderr=None # done, stderr not available when combine_stderr is `True`
-    # timeout=None # todo
+    # timeout=None # done
     # shell_escape=None # ignored. shell commands are always escaped
     # capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
 
@@ -230,6 +233,8 @@ def remote(command, **kwargs):
         "discard_output": False,
         "remote_working_dir": None,
         "timeout": None,
+        "warn_only": False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        "abort_exception": RuntimeError,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -283,7 +288,24 @@ def remote(command, **kwargs):
             "succeeded": return_code == 0,
         }
     )
-    return result
+
+    if result["succeeded"]:
+        return result
+
+    err_msg = "remote() encountered an error (return code %s) while executing %r" % (
+        result["return_code"],
+        command,
+    )
+
+    if final_kwargs["warn_only"]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs["abort_exception"]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, "result", result)
+
+    raise exc
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
@@ -317,9 +339,13 @@ def remote_file_exists(path, **kwargs):
         "use_sudo": False,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # do not raise an exception if remote file doesn't exist
+    final_kwargs["warn_only"] = True
+
     remote_fn = remote_sudo if final_kwargs["use_sudo"] else remote
     command = "test -e %s" % path
-    return remote_fn(command, **kwargs)["return_code"] == 0
+    return remote_fn(command, **final_kwargs)["return_code"] == 0
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
@@ -330,6 +356,8 @@ def local(command, **kwargs):
         "capture": False,
         "timeout": None,
         "quiet": False,
+        "warn_only": False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        "abort_exception": RuntimeError,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
@@ -390,7 +418,23 @@ def local(command, **kwargs):
     if devnull_opened:
         DEVNULL.close()
 
-    return result
+    if result["succeeded"]:
+        return result
+
+    err_msg = "local() encountered an error (return code %s) while executing %r" % (
+        result["return_code"],
+        command,
+    )
+
+    if final_kwargs["warn_only"]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs["abort_exception"]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, "result", result)
+
+    raise exc
 
 
 def single_command(cmd_list):
@@ -461,7 +505,8 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
         if remote_path.endswith("/"):
             raise ValueError("directory downloads are not supported")
 
-        result = remote('test -d "%s"' % remote_path, use_sudo=use_sudo)
+        # do not raise an exception if remote file doesn't exist
+        result = remote('test -d "%s"' % remote_path, use_sudo=use_sudo, warn_only=True)
         remote_path_is_dir = result["succeeded"]
         if remote_path_is_dir:
             raise ValueError("directory downloads are not supported")
