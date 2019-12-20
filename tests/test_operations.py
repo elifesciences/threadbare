@@ -380,7 +380,7 @@ def test_local_command_split_stderr():
 
 
 def test_local_command_non_zero_exit():
-    "local commands raise a generic exception if the command they execute exits with a non-zero result"
+    "`local` commands raise a generic `RuntimeError` if the command they execute exits with a non-zero result"
     with pytest.raises(RuntimeError) as err:
         operations.local("exit 1")
     exc = err.value
@@ -400,7 +400,7 @@ def test_local_command_non_zero_exit():
 
 
 def test_local_command_non_zero_custom_exit():
-    "local commands may raise a specific exception if the command they execute exits with a non-zero result"
+    "`local` commands may raise a specific exception if the command they execute exits with a non-zero result"
     with pytest.raises(ValueError) as err:
         operations.local("exit 1", abort_exception=ValueError)
     exc = err.value
@@ -420,7 +420,7 @@ def test_local_command_non_zero_custom_exit():
 
 
 def test_local_command_non_zero_exit_swallowed():
-    "local commands that exit with a non-zero result do not raise an exception if `warn_only` is `True`"
+    "`local` commands that exit with a non-zero result do not raise an exception if `warn_only` is `True`"
     expected_result = {
         "command": '/bin/bash -l -c "exit 1"',
         "failed": True,
@@ -441,7 +441,7 @@ def test_local_command_non_zero_exit_swallowed():
 
 
 def test_local_command_timeout():
-    "local commands can be killed if their execution exceeds a timeout threshold"
+    "`local` commands can be killed if their execution exceeds a timeout threshold"
     command = "sleep 5"
     expected = {
         "succeeded": False,

@@ -340,7 +340,7 @@ def remote_file_exists(path, **kwargs):
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
-    # never fail if a remote file does not exist
+    # do not raise an exception if remote file doesn't exist
     final_kwargs["warn_only"] = True
 
     remote_fn = remote_sudo if final_kwargs["use_sudo"] else remote
@@ -505,6 +505,7 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
         if remote_path.endswith("/"):
             raise ValueError("directory downloads are not supported")
 
+        # do not raise an exception if remote file doesn't exist
         result = remote('test -d "%s"' % remote_path, use_sudo=use_sudo, warn_only=True)
         remote_path_is_dir = result["succeeded"]
         if remote_path_is_dir:

@@ -122,14 +122,14 @@ def test_run_many_local_commands_in_parallel():
 
 
 def test_run_a_remote_command():
-    "run a simple remote command"
+    "run a simple `remote` command"
     with test_settings(quiet=True):
         result = remote(r'echo -e "\e[31mRed Text!!\e[0m"')
         assert result["succeeded"]
 
 
 def test_run_a_remote_command_in_a_different_dir():
-    "run a simple remote command in a different remote directory"
+    "run a simple `remote` command in a different remote directory"
     with test_settings():
         with rcd("/tmp"):
             result = remote("pwd")
@@ -137,7 +137,7 @@ def test_run_a_remote_command_in_a_different_dir():
 
 
 def test_run_a_remote_command_but_hide_output():
-    "presumably for side effects"
+    "run a simple `remote` command but don't print anything"
     with test_settings():
         with hide():
             result = remote("echo hi!")
@@ -147,14 +147,14 @@ def test_run_a_remote_command_but_hide_output():
 
 
 def test_run_a_remote_command_as_root():
-    "run a simple remote command as root"
+    "run a simple `remote` command as the root user"
     with test_settings():
         result = remote_sudo("cd /root && echo tapdance in $(pwd)")
         assert result["succeeded"]
 
 
 def test_run_a_remote_command_with_separate_streams():
-    "run a simple remote command and capture stdout and stderr separately"
+    "run a simple `remote` command and capture stdout and stderr separately"
     with test_settings():
         result = remote(
             'echo "standard out"; >&2 echo "standard error"', combine_stderr=False,
@@ -164,8 +164,15 @@ def test_run_a_remote_command_with_separate_streams():
         assert result["stderr"] == ["standard error"]
 
 
+def test_run_a_remote_command_with_shell_interpolation():
+    "run a simple `remote` command including variables"
+    with test_settings(quiet=True):
+        assert remote('foo=bar; echo "bar? $foo!"')["succeeded"]
+        assert remote('foo=bar; echo "bar? $foo!"', use_shell=False)["succeeded"]
+
+
 def test_run_a_remote_command_non_zero_return_code():
-    """remote commands, like local commands, will raise a RuntimeError if the command they execute fails.
+    """`remote` commands, like `local` commands, will raise a RuntimeError if the command they execute fails.
     the results of the command are still available via the `result` attribute on the exception object"""
     with test_settings():
         with pytest.raises(RuntimeError) as err:
@@ -177,7 +184,7 @@ def test_run_a_remote_command_non_zero_return_code():
 
 
 def test_run_a_remote_command_non_zero_custom_exit():
-    """remote commands, like local commands, may raise a custom exception if the command they execute fails.
+    """`remote` commands, like `local` commands, may raise a custom exception if the command they execute fails.
     the results of the command are still available via the `result` attribute on the exception object"""
     with test_settings():
         with pytest.raises(ValueError) as err:
@@ -189,7 +196,7 @@ def test_run_a_remote_command_non_zero_custom_exit():
 
 
 def test_run_a_remote_command_non_zero_return_code_swallow_error():
-    "remote commands, like local commands, can return the results of failed executions by passing the `warn_only=True` option"
+    "`remote` commands, like `local` commands, can return the results of failed executions when `warn_only` is `True`"
     with test_settings(warn_only=True):
         result = remote("exit 123")
         assert result["return_code"] == 123
@@ -197,15 +204,8 @@ def test_run_a_remote_command_non_zero_return_code_swallow_error():
         assert not result["succeeded"]
 
 
-def test_run_a_remote_command_with_shell_interpolation():
-    "run a simple remote command including variables"
-    with test_settings(quiet=True):
-        assert remote('foo=bar; echo "bar? $foo!"')["succeeded"]
-        assert remote('foo=bar; echo "bar? $foo!"', use_shell=False)["succeeded"]
-
-
 def test_run_many_remote_commands():
-    "running many remote commands re-uses the established ssh session"
+    "running many `remote` commands re-uses the established ssh session"
     command_list = [
         "echo all",
         "echo these commands",
@@ -219,7 +219,7 @@ def test_run_many_remote_commands():
 
 
 def test_run_many_remote_commands_singly():
-    "running many remote commands re-uses the established ssh session"
+    "running many `remote` commands re-uses the established ssh session"
     command_list = [
         "echo all",
         "echo these commands",
@@ -232,8 +232,10 @@ def test_run_many_remote_commands_singly():
 
 
 def test_run_many_remote_commands_serially():
-    """run a list of remote commands serially. remote commands run serially 
-    with `execute` do not share a ssh connection (at time of writing)"""
+    """run a list of `remote` commands serially. `remote` commands run serially 
+    with `execute` do not share a ssh connection (at time of writing)
+    TODO: investigate above statement. explain why
+    """
     command_list = [
         "echo all",
         "echo these commands",
@@ -253,11 +255,9 @@ def test_run_many_remote_commands_serially():
 
 
 def test_run_many_remote_commands_in_parallel():
-    """run a list of remote commands in parallel. remote commands run with `execute` 
-    do not share a ssh connection.
-    
-    the order of results can be guaranteed but not the order in which any output is 
-    written to the screen."""
+    """run a list of `remote` commands in parallel. 
+    `remote` commands run in parallel do not share a ssh connection.
+    the order of results can be guaranteed but not the order in which output is emitted"""
     command_list = [
         "echo all",
         "echo these commands",
