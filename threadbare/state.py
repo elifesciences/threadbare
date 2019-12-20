@@ -38,27 +38,28 @@ def read_write(d):
         d.read_only = False
 
 
-def init_state():
-    "returns a new, empty, locked, LockableDict instance that is used as the initial `state.ENV` value"
-    # if you are thinking, "it would be really convenient if 'some_setting' was 'some_value' by default,
-    # see `set_defaults`.
+def initial_state():
+    """returns a new, empty, locked, LockableDict instance that is used as the initial `state.ENV` value.
+    
+    if you are thinking "it would be really convenient if 'some_setting' was 'some_value' by default",
+    see `set_defaults`."""
     new_env = LockableDict()
     read_only(new_env)
     return new_env
 
 
-ENV = init_state()
+ENV = initial_state()
 
 DEPTH = 0  # used to determine how deeply nested we are
 
 
-def set_defaults(defaults_dict=None, ignore_depth=False):
+def set_defaults(defaults_dict=None):
     """re-initialises the `state.ENV` dictionary with the given defaults.
     with no arguments, the global state will be reverted to it's initial state (an empty LockableDict).
 
     use `state.set_defaults` BEFORE using ANY other `state.*` functions are called."""
     global ENV, DEPTH
-    if DEPTH != 0 and not ignore_depth:
+    if DEPTH != 0:
         msg = "refusing to set initial `threadbare.state.ENV` state within a `threadbare.state.settings` context manager."
         raise EnvironmentError(msg)
 
@@ -101,8 +102,8 @@ def settings(**kwargs):
     # the SSHClient is one such unserialisable object that has had to be subclassed
     # another approach would be to relax guarantees that the environment is completely reverted
 
-    # call read_write here, as `deepcopy` copies across attributes (like 'read_only') and values
-    # using `__setitem__`, causing errors in LockableDict
+    # call `read_write` here as `deepcopy` copies across attributes (like `read_only`) and
+    # then values using `__setitem__`, causing errors in LockableDict when 'set_defaults' used
     read_write(state)
 
     original_values = copy.deepcopy(state)

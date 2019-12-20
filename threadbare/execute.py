@@ -3,7 +3,6 @@ from multiprocessing import Process, Queue
 import time
 from .common import first
 from . import state
-import traceback
 
 
 def serial(func, pool_size=None):
@@ -32,6 +31,8 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
     """this function is executed in another process. it wraps the given `worker_func`, initialising the `state.ENV` of 
     the new process and adds its results to the given `queue`"""
     try:
+        assert isinstance(env, dict), "given environment must be a dictionary"
+
         # Fabric is nuking the child process's env dictionary
         # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L229-L237
 
@@ -52,7 +53,9 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         result = worker_func()
         queue.put({"name": name, "result": result})
     except BaseException as unhandled_exception:
-        traceback.print_exc()  # for debugging
+        # kept for debugging
+        # import traceback
+        # traceback.print_exc()
 
         # "Note that exit handlers and finally clauses, etc., will not be executed."
         # - https://docs.python.org/2/library/multiprocessing.html#multiprocessing.Process.terminate
