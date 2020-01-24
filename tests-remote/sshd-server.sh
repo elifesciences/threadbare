@@ -40,6 +40,6 @@ cat "$temp_dir/.ssh/dummy_user_key.pub" > "$temp_dir/.ssh/authorized_keys"
 # -f -- path to custom sshd config
 # -h -- host key file, just a simple private key
 # for more output, set "LogLevel DEBUG" in `sshd_config`. default is INFO
-/usr/bin/sshd -D -e -f "$SCRIPT_PATH/sshd_config" -h "$temp_dir/.ssh/dummy_host_key"
+/usr/sbin/sshd -D -e -f "$SCRIPT_PATH/sshd_config" -h "$temp_dir/.ssh/dummy_host_key"
 
 # at this point you can run the ./ssh-client.sh script to check the server is running properly
