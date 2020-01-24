@@ -24,6 +24,7 @@
 - [x] implement ssh session sharing so multiple commands can be run
 - [x] output is being duplicated, once from logging, once from us. what does builder do?
 - [x] separate development dependencies from required ones
+- [x] test against local sshd server
 - [ ] test automation
 - [x] python 2 tests
 - [x] python 3 tests
