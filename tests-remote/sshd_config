@@ -5,8 +5,8 @@
 
 Port 2222
 
-# don't ever do this in real environments
-# this just lets us get around some permissions settings
+# don't ever set this in a serious environment.
+# this allows us to bypass some permissions requirements.
 StrictModes no
 
 # Logging
@@ -14,7 +14,6 @@ StrictModes no
 LogLevel INFO
 
 # Authentication:
-
 PermitRootLogin no
 PubkeyAuthentication yes
 
