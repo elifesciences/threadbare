@@ -468,7 +468,7 @@ def test_check_many_remote_files():
 
     with test_settings():
         remote_file_list = [
-            "/var/log/syslog",  # True, exists
+            "/var/log/wtmp",  # True, exists
             "/foo/bar",  # False, doesn't exist
         ]
 
