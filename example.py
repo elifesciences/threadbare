@@ -24,15 +24,17 @@ logging.basicConfig()
 LOG = logging.getLogger(__name__)
 
 HOST = os.environ.get("THREADBARE_TEST_HOST")
+PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
+KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
 
 _help_text = """two environment variables must be defined before executing this script:
 THREADBARE_TEST_HOST=yourhost
 THREADBARE_TEST_USER=youruser
 """
-assert HOST and USER, _help_text
+assert HOST and PORT and USER, _help_text
 
-test_settings = partial(settings, user=USER, host_string=HOST)
+test_settings = partial(settings, user=USER, port=int(PORT), host_string=HOST, key_filename=KEY)
 
 # local tests
 # see `tests/test_state.py` and `tests/test_operations.py` for more examples
@@ -273,7 +275,8 @@ def _upload_a_file(local_file_name):
     local_file_contents = "foo"
     with open(local_file_name, "w") as fh:
         fh.write(local_file_contents)
-    remote_file_name = "/tmp/threadbare-payload.tmp"
+    # todo: these filenames are confusing when both local and remote machines are the same
+    remote_file_name = "/tmp/threadbare-payload.tmp1" 
     upload(local_file_name, remote_file_name)
     assert remote_file_exists(remote_file_name)
     return remote_file_name
@@ -448,7 +451,7 @@ def test_upload_and_download_a_file_using_byte_buffers():
 
 def test_check_remote_files():
     "check that remote files can be found (or not)"
-    file_that_exists = "/var/log/syslog"
+    file_that_exists = "/var/log/wtmp" # login/logout entries (see `man last`)
     file_that_does_not_exist = "/foo/bar"
     with test_settings():
         assert remote_file_exists(file_that_exists)
