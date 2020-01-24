@@ -19,6 +19,6 @@ fi
 export THREADBARE_TEST_HOST=localhost
 export THREADBARE_TEST_PORT=2222
 export THREADBARE_TEST_USER="$USER"
-export THREADBARE_TEST_PUBKEY="./tests-remote/cert/dummy_user_key"
+export THREADBARE_TEST_PUBKEY="$PWD/tests-remote/cert/dummy_user_key"
 source venv/bin/activate
 pytest example.py -vv "$@"
