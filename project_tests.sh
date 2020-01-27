@@ -4,14 +4,22 @@
 
 set -e
 
+echo "(destroying any venv)"
 rm -rf venv/
 
-. mkvenv.sh
-
+# creates a venv and test dependencies
 . install.sh
 
 ./tests-remote/sshd-server.sh &
 pid=$!
+
+echo "pid:$pid"
+function finish {
+    echo "cleaning up: $pid"
+    # terminates the child sshd server that in turn ends the `sshd-server.sh` script
+    kill $(pgrep -P "$pid") 
+}
+trap finish EXIT
 
 # remove any old compiled python files
 # pylint likes to lint them, pytest likes to test them
@@ -25,6 +33,8 @@ export THREADBARE_TEST_PORT=2222
 export THREADBARE_TEST_USER="$USER"
 export THREADBARE_TEST_PUBKEY="/tmp/sshd-dummy/.ssh/dummy_user_key"
 
+source venv/bin/activate
+
 # no further args passed to test script
 # run with coverage and reporting enabled
 PYTHONPATH=threadbare/ python -m pytest \
@@ -33,5 +43,3 @@ PYTHONPATH=threadbare/ python -m pytest \
     --cov=threadbare/ \
     --cov-report html --cov-report term \
     --cov-fail-under 95
-
-kill "$pid"

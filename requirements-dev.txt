@@ -1,3 +1,5 @@
 parallel-ssh
 pytest
 pytest-cov
+pyflakes
+black
