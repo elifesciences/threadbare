@@ -76,7 +76,8 @@ Global state can be built up by nesting context managers like `settings` or `hid
 environment dictionary, and then popping it off as execution leaves the context manager.
 
 The `state` module replicates this mechanism but with no initial defaults. Default values are pushed back into the 
-functions and may be overridden globally in a general way or overridden specifically by passing in a keyword argument.
+functions and may be overridden globally in a general way or overridden specifically by passing in a keyword argument to
+the function.
 
 This change:
 
@@ -120,5 +121,5 @@ mechanism for manipulating global state.
 * changes to global state within the worker function does not propagate back to the parent
 * SSH connections cannot be passed to child processes so new connections are made within the child process if necessary
 * child processes cannot prompt for input. They have no access to stdin.
-* child processes may die or throw exceptions that can't be properly
+* child processes may die or throw exceptions that can't be properly handled in the parent
 
