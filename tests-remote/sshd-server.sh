@@ -37,9 +37,10 @@ cat "$temp_dir/.ssh/dummy_user_key.pub" > "$temp_dir/.ssh/authorized_keys"
 
 # -D -- do NOT become a daemon
 # -e -- write debug log to stderr
+# -q -- nothing is sent to the system log. disable to see sshd server output
 # -f -- path to custom sshd config
 # -h -- host key file, just a simple private key
 # for more output, set "LogLevel DEBUG" in `sshd_config`. default is INFO
-/usr/sbin/sshd -D -e -f "$SCRIPT_PATH/sshd_config" -h "$temp_dir/.ssh/dummy_host_key"
+$(which sshd) -D -e -q -f "$SCRIPT_PATH/sshd_config" -h "$temp_dir/.ssh/dummy_host_key"
 
 # at this point you can run the ./ssh-client.sh script to check the server is running properly

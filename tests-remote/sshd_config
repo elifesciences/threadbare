@@ -37,4 +37,8 @@ PidFile /tmp/sshd-dummy/sshd.pid
 
 # override default of no subsystems
 # necessary for uploads and downloads
-Subsystem	sftp	/usr/lib/ssh/sftp-server
+# 'internal-sftp' or a path?
+#  - https://serverfault.com/questions/660160/openssh-difference-between-internal-sftp-and-sftp-server
+# it also means we can handily avoid hardcoding a path that differs between arch and ubuntu
+#Subsystem sftp /usr/lib/ssh/sftp-server
+Subsystem sftp internal-sftp
