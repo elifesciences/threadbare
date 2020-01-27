@@ -25,7 +25,7 @@
 - [x] output is being duplicated, once from logging, once from us. what does builder do?
 - [x] separate development dependencies from required ones
 - [x] test against local sshd server
-- [ ] test automation
+- [x] test automation
 - [x] python 2 tests
 - [x] python 3 tests
 - [x] integrate with builder
@@ -36,6 +36,8 @@
 ## TODO bucket
 
 - [ ] move taskrunner from builder into threadbare, including tests
+- [ ] SFTP is excrutiatingly slow. Can we switch to SCP?
+    - This is not a Fabric/Threadbare/Paramiko/ParallelSSH problem but a SSH/SFTP problem.
 
 ## investigate:
 
@@ -47,14 +49,11 @@
     defintions of 'prompt'
     - it will abort if *Fabric* issues the prompt, but not if *you* issue a command that requires a prompt
         - for example, this will **not** abort:
-        
+
 ```
     with settings(abort_on_prompts=True):
         local("read -p '> '")
 ```
-
-* SFTP (default for pssh and fabric) is excruciatingly slow
-    - can we safely switch to SCP?
 
 * env `linewise`
     - used in `get`
