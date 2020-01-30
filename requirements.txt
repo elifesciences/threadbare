@@ -1,3 +1,4 @@
 parallel-ssh
 pytest
 pytest-cov
+six
