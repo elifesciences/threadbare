@@ -125,6 +125,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
             if not result["alive"]:
                 result_map[result["name"]] = result
                 del pool[idx]
+        # introduces the slightest of delays so that we're not manically polling every microsecond
         time.sleep(0.1)
 
     # all processes are complete

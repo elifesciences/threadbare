@@ -59,6 +59,20 @@ class NetworkError(BaseException):
         return new_error + space + original_error
 
 
+def pem_key():
+    """returns the first private key found in a list of common private keys.
+    if none of the keys exist, the default (first) key will be returned."""
+    id_list = ["id_rsa", "id_dsa", "identity", "id_ecdsa"]
+    id_list = [os.path.expanduser("~/.ssh/" + idstr) for idstr in id_list]
+    for id_path in id_list:
+        if os.path.isfile(id_path):
+            return id_path
+        LOG.debug("key not found: %s" % id_path)
+
+    default = id_list[0]
+    return default
+
+
 def handle(base_kwargs, kwargs):
     """handles the merging of the base set of function keyword arguments and their possible overrides.
     `base_kwargs` is a map of the function's keyword arguments and their defaults.
@@ -119,9 +133,9 @@ def _ssh_client(**kwargs):
         # current user. sensible default but probably not what you want
         "user": getpass.getuser(),
         "host_string": None,
-        # TODO: parallel-ssh and fabric both look for the same ~4 possible keys and
-        # use the first one they find. implement that behaviour
-        "key_filename": os.path.expanduser("~/.ssh/id_rsa"),
+        # looks for the same ~4 possible keys as Fabric and ParallelSSH.
+        # uses the first one it finds or the most common if none found.
+        "key_filename": pem_key(),
         "port": 22,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
