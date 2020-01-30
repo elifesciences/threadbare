@@ -9,12 +9,12 @@ class PromptedException(BaseException):
 def has_type(x, t, msg=None):
     "raises TypeError if given `x` is not of type `t`"
 
-    PY3 = sys.version_info[0] == 3
+    PY2 = sys.version_info[0] == 2
 
-    if PY3:
-        string_types = str
-    else:
+    if PY2:
         string_types = basestring
+    else:
+        string_types = str
 
     msg = msg or "%r is not of expected type %r" % (x, t)
     if t == str and not isinstance(x, string_types):
