@@ -1,3 +1,4 @@
+import pytest
 from threadbare import common
 
 
@@ -7,15 +8,23 @@ def test_first():
         ["", None],
         [[], None],
         [(), None],
-        [{}, None],
         ["abc", "a"],
         [[1, 2, 3], 1],
         [(3, 2, 1), 3],
-        [{1: 2}, (1, 2)],  # non-deterministic in most versions of python, don't do this
     ]
     for given, expected in cases:
         actual = common.first(given)
         assert expected == actual, "failed on case: %r => %r" % (expected, actual)
+
+
+def test_first_bad_cases():
+    dict_cases = [
+        {},
+        {1: 2},  # non-deterministic in all versions of python prior to 3.7
+    ]
+    for case in dict_cases:
+        with pytest.raises(KeyError):
+            common.first(case)
 
 
 def test_merge():

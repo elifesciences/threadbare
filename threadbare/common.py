@@ -11,11 +11,11 @@ def first(x):
     if x is None:
         return x
     try:
-        if isinstance(x, dict):
-            return list(x.items())[0]
         return x[0]
-    except (ValueError, IndexError):
+    except IndexError:
         return None
+    except (ValueError, KeyError):
+        raise
 
 
 def merge(*dict_list):
