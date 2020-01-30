@@ -51,3 +51,17 @@ def test_subdict():
     for d, key_list, expected in cases:
         actual = common.subdict(d, key_list)
         assert expected == actual
+
+
+def test__shell_escape():
+    cases = [["", ""], ["$abc", "\\$abc"], ['"', '\\"'], ["`", "\\`"]]
+    for given, expected in cases:
+        actual = common._shell_escape(given)
+        assert expected == actual
+
+
+def test__shell_escape_bad_cases():
+    bad_types = [[None, TypeError], [b"", TypeError]]
+    for given, expected in bad_types:
+        with pytest.raises(expected):
+            common._shell_escape(given)

@@ -13,7 +13,7 @@ from .common import (
     rename,
     cwd,
     sudo_wrap_command,
-    pwd_wrap_command,
+    cwd_wrap_command,
     shell_wrap_command,
 )
 from pssh.clients.native import SSHClient as PSSHClient
@@ -257,7 +257,7 @@ def remote(command, **kwargs):
     # wrap the command up
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
     if final_kwargs["remote_working_dir"]:
-        command = pwd_wrap_command(command, final_kwargs["remote_working_dir"])
+        command = cwd_wrap_command(command, final_kwargs["remote_working_dir"])
     if final_kwargs["use_shell"]:
         command = shell_wrap_command(command)
     if final_kwargs["use_sudo"]:
