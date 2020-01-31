@@ -2,4 +2,9 @@
 *~
 *.orig
 *.log
-venv
+.tox/
+venv/
+threadbare.egg-info/
+.tox/
+.coverage
+htmlcov/
