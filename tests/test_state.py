@@ -65,7 +65,7 @@ def test_global_deleted_state():
 @reset
 def test_uncontrolled_global_state_modification():
     "modifications to global state outside of a context manager are prohibited"
-    assert isinstance(state.ENV, state.LockableDict)  # type check
+    assert isinstance(state.ENV, state.FreezeableDict)  # type check
     assert state.ENV == {}  # empty value
     with pytest.raises(ValueError):
         state.ENV["foo"] = "bar"
@@ -75,7 +75,7 @@ def test_uncontrolled_global_state_modification():
 def test_uncontrolled_global_state_modification_2():
     """modifications to global state that happen outside of the context manager's 
     control (with ... as ...) are available as expected BUT are reverted on exit"""
-    assert isinstance(state.ENV, state.LockableDict)
+    assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV == {}
     with settings() as env:
         state.ENV["foo"] = {"bar": "bop"}
@@ -86,11 +86,11 @@ def test_uncontrolled_global_state_modification_2():
 @reset
 def test_uncontrolled_global_state_modification_3():
     "modifications to global state outside of a context manager are prohibited UNLESS you're using own dictionary-like state object"
-    assert isinstance(state.ENV, state.LockableDict)
+    assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV == {}
 
     state.ENV = {}
-    assert not isinstance(state.ENV, state.LockableDict)
+    assert not isinstance(state.ENV, state.FreezeableDict)
 
     # ENV is now a regular dictionary
 
@@ -101,7 +101,7 @@ def test_uncontrolled_global_state_modification_3():
 @reset
 def test_global_state_is_unlocked_inside_context():
     "`state.ENV` is only writeable within the context manager"
-    assert isinstance(state.ENV, state.LockableDict)
+    assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV.read_only
     with settings():
         assert not state.ENV.read_only
@@ -113,7 +113,7 @@ def test_global_state_is_unlocked_inside_context():
 @reset
 def test_nested_global_state_is_unlocked_inside_context():
     "`state.ENV` is only writeable within the context manager, including nested context managers"
-    assert isinstance(state.ENV, state.LockableDict)
+    assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV.read_only
     with settings():
         assert not state.ENV.read_only
@@ -131,7 +131,7 @@ def test_nested_global_state_is_unlocked_inside_context():
 @reset
 def test_lockable_dict():
     "a lockable dictionary has a simple locked/unlocked boolean preventing write access. default is unlocked"
-    foo = state.LockableDict()
+    foo = state.FreezeableDict()
     assert not foo.read_only
 
     state.read_only(foo)
@@ -143,8 +143,8 @@ def test_lockable_dict():
 
 @reset
 def test_lockable_dict_attrs_preserved():
-    "creating a copy of a LockableDict objects preserves the state of the locked/unlocked boolean"
-    foo = state.LockableDict()
+    "creating a copy of a FreezeableDict objects preserves the state of the locked/unlocked boolean"
+    foo = state.FreezeableDict()
     assert not foo.read_only
 
     state.read_only(foo)  # alter foo
@@ -152,7 +152,7 @@ def test_lockable_dict_attrs_preserved():
 
     baz = copy.deepcopy(foo)  # happens when we context shift
     assert baz.read_only
-    assert isinstance(baz, state.LockableDict)
+    assert isinstance(baz, state.FreezeableDict)
 
 
 # cleanup
@@ -200,9 +200,9 @@ def test_set_defaults():
     state.set_defaults({"foo": "bar"})
     assert state.DEPTH == 0
 
-    expected_state = state.LockableDict({"foo": "bar"})
+    expected_state = state.FreezeableDict({"foo": "bar"})
     assert state.ENV == expected_state
-    assert isinstance(state.ENV, state.LockableDict)
+    assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV.read_only
 
 

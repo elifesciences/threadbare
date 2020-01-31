@@ -13,7 +13,7 @@ from .common import (
     rename,
     cwd,
     sudo_wrap_command,
-    pwd_wrap_command,
+    cwd_wrap_command,
     shell_wrap_command,
 )
 from pssh.clients.native import SSHClient as PSSHClient
@@ -32,7 +32,7 @@ class SSHClient(PSSHClient):
 
 class NetworkError(BaseException):
     """generic 'died while doing something ssh-related' catch-all exception class.
-    calling str() on this exception will return the results on calling str() on the
+    calling str() on this exception will return the results of calling str() on the
     wrapped exception."""
 
     def __init__(self, wrapped_exception_inst):
@@ -40,8 +40,8 @@ class NetworkError(BaseException):
 
     def __str__(self):
         # we have the opportunity here to tweak the error messages to make them
-        # similar with their equivalents in Fabric.
-        # original error messages are still available via `str(exinst.wrapped)`
+        # similar to their equivalents in Fabric.
+        # original error messages are still available via `str(excinst.wrapped)`
         space = " "
         custom_error_prefixes = {
             # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
@@ -59,7 +59,35 @@ class NetworkError(BaseException):
         return new_error + space + original_error
 
 
+def pem_key():
+    """returns the first private key found in a list of common private keys.
+    if none of the keys exist, the default (first) key will be returned."""
+    id_list = ["id_rsa", "id_dsa", "identity", "id_ecdsa"]
+    id_list = [os.path.expanduser("~/.ssh/" + idstr) for idstr in id_list]
+    for id_path in id_list:
+        if os.path.isfile(id_path):
+            return id_path
+        LOG.debug("key not found: %s" % id_path)
+
+    default = id_list[0]
+    return default
+
+
 def handle(base_kwargs, kwargs):
+    """handles the merging of the base set of function keyword arguments and their possible overrides.
+    `base_kwargs` is a map of the function's keyword arguments and their defaults.
+    `kwargs` are the keyword arguments used when executing the function.
+
+    the keys from `base_kwargs` are used to determine which keys to extract from the `kwargs` and any
+    global settings.
+
+    returns a triple of (`global_kwargs`, `user_kwargs`, `final_kwargs`) where
+    `global_kwargs` is the subset of keyword arguments extracted from `state.env`,
+    `user_kwargs` is the subset of keyword arguments extracted from the given kwargs and
+    `final_kwargs` is the result of merging `base_kwargs` <- `global_kwargs` <- `user_kwargs`
+
+    'user' keyword arguments that are explicitly passed in take precedence over all others and
+    'global' keyword arguments take precedence over the function's defaults kwargs."""
     key_list = base_kwargs.keys()
     global_kwargs = subdict(state.ENV, key_list)
     user_kwargs = subdict(kwargs, key_list)
@@ -105,7 +133,9 @@ def _ssh_client(**kwargs):
         # current user. sensible default but probably not what you want
         "user": getpass.getuser(),
         "host_string": None,
-        "key_filename": os.path.expanduser("~/.ssh/id_rsa"),
+        # looks for the same ~4 possible keys as Fabric and ParallelSSH.
+        # uses the first one it finds or the most common if none found.
+        "key_filename": pem_key(),
         "port": 22,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
@@ -121,7 +151,7 @@ def _ssh_client(**kwargs):
     client_key = subdict(final_kwargs, ["user", "host", "pkey", "port", "timeout"])
     client_key = tuple(sorted(client_key.items()))
 
-    # otherwise, check to see if a previous client is available
+    # otherwise, check to see if a previous client is available for this host
     client_map = env.get(client_map_key, {})
     if client_key in client_map:
         return client_map[client_key]
@@ -171,7 +201,7 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
         }
     except BaseException as ex:
         # *probably* a network error:
-        # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
+        # - https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
         raise NetworkError(ex)
 
 
@@ -209,7 +239,7 @@ def remote(command, **kwargs):
 
     # Fabric function signature for `run`
     # shell=True # done
-    # pty=True   # mutually exclusive with combine_stderr. not sure what Fabric/Paramiko is doing here
+    # pty=True   # mutually exclusive with `combine_stderr` in pssh. not sure how Fabric/Paramiko is doing it
     # combine_stderr=None # mutually exclusive with use_pty. 'True' in global env.
     # quiet=False, # done
     # warn_only=False # done
@@ -241,7 +271,7 @@ def remote(command, **kwargs):
     # wrap the command up
     # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
     if final_kwargs["remote_working_dir"]:
-        command = pwd_wrap_command(command, final_kwargs["remote_working_dir"])
+        command = cwd_wrap_command(command, final_kwargs["remote_working_dir"])
     if final_kwargs["use_shell"]:
         command = shell_wrap_command(command)
     if final_kwargs["use_sudo"]:
@@ -335,6 +365,13 @@ def remote_file_exists(path, **kwargs):
     # $ echo $foo
     # /usr/*/share
 
+    # TODO: revisit
+    # update 2020/01: it does work, I just had no "/usr/[anything]/share" directories.
+    # this works for me:
+    #   foo=$(echo /\*/share/)
+    #   echo $foo
+    #   /usr/share/
+
     base_kwargs = {
         "use_sudo": False,
     }
@@ -350,6 +387,7 @@ def remote_file_exists(path, **kwargs):
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
 def local(command, **kwargs):
+    "preprocesses given `command` and options before executing it locally using Python's `subprocess.Popen`"
     base_kwargs = {
         "use_shell": True,
         "combine_stderr": True,
@@ -438,16 +476,16 @@ def local(command, **kwargs):
 
 
 def single_command(cmd_list):
-    """given a list of commands to run, returns a single command
-    `remote` and `local` are expected to do any escaping as necessary"""
+    "given a list of commands to run, returns a single command."
+    # `remote` and `local` will do any escaping as necessary
     if cmd_list in [None, []]:
         return None
     return " && ".join(map(str, cmd_list))
 
 
 def prompt(msg):
-    """issues a prompt for input. 
-    raises a PromptedException if `abort_on_prompts` in `state.ENV` is `True` or executing within 
+    """issues a prompt for input.
+    raises a `PromptedException` if `abort_on_prompts` in `state.ENV` is `True` or executing within
     another process using `execute.parallel` where input can't be supplied.
     if `abort_exception` is set in `state.ENV`, then that exception is raised instead"""
     if state.ENV.get("abort_on_prompts", False):

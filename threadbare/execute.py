@@ -5,6 +5,7 @@ from .common import first
 from . import state
 
 
+# https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L148-L161
 def serial(func, pool_size=None):
     """Forces the given function to run `pool_size` times.
     when pool_size is None (default), executor decides how many instances of `func` to execute (1, probably).
@@ -17,10 +18,9 @@ def serial(func, pool_size=None):
     return inner
 
 
+# https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
 def parallel(func, pool_size=None):
-    """Forces the wrapped function to run in parallel, instead of sequentially.
-    This is an opportunity for pre/post process work prior to calling a function in parallel."""
-    # https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
+    """Forces the wrapped function to run in parallel, instead of sequentially."""
     wrapped_func = serial(func, pool_size)
     # `func` *must* be forced to run in parallel to main process
     wrapped_func.parallel = True
@@ -28,24 +28,19 @@ def parallel(func, pool_size=None):
 
 
 def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
-    """this function is executed in another process. it wraps the given `worker_func`, initialising the `state.ENV` of 
+    """this function is executed in another process. it wraps the given `worker_func`, initialising the `state.ENV` of
     the new process and adds its results to the given `queue`"""
     try:
         assert isinstance(env, dict), "given environment must be a dictionary"
 
-        # Fabric is nuking the child process's env dictionary
-        # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L229-L237
-
-        # what we can do is say that worker functions executed in parallel must use the
-        # implicit `settings() as env` invocation rather than `settings(env)` as we have
-        # no reference to `env` unless the worker function accepts it as a parameter.
-        # and we can't rely on that.
+        # Fabric nukes the child process's `env` dictionary
+        # - https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L229-L237
 
         # note: not possible to service stdin when multiprocessing
         env["abort_on_prompts"] = True
 
-        # we don't care what the parent process had when Python copied across it's state
-        # to execute this worker_func in parallel. reset it now. the process is destroyed upon leaving.
+        # we don't care what the parent process had when Python copied across it's state to
+        # execute this `worker_func` in parallel. reset it now. the process is destroyed upon leaving.
 
         state.DEPTH = 0
         state.set_defaults(env)
@@ -130,6 +125,7 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
             if not result["alive"]:
                 result_map[result["name"]] = result
                 del pool[idx]
+        # introduces the slightest of delays so that we're not manically polling every microsecond
         time.sleep(0.1)
 
     # all processes are complete
@@ -151,7 +147,6 @@ def _serial_execution(func, param_key, param_values):
     result_list = []
     if param_key and param_values:
         for x in param_values:
-            # TODO: this prevent ssh clients from being shared
             with state.settings(**{param_key: x}):
                 result_list.append(func())
     else:
@@ -177,12 +172,12 @@ def execute(func, param_key=None, param_values=None):
     parent process blocks until all child processes have completed.
     returns a map of execution data with the return values of the individual executions available under 'result'"""
 
-    # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is correct
-    # before passing it to `_execute` that does the actual magic.
+    # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is
+    # correct before passing it to `_execute` that does the actual magic.
     # `execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L372-L401
     # `_execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L213-L277
 
-    # the custom 'JobQueue' adds complexity but can be avoided (I hope):
+    # Fabric's custom 'JobQueue' adds complexity but can be avoided:
     # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
 
     if (param_key and param_values is None) or (param_key is None and param_values):

@@ -6,16 +6,23 @@ class PromptedException(BaseException):
     pass
 
 
+def ensure(assertion, msg, exception_class=AssertionError):
+    """intended as a convenient replacement for `assert` statements that
+    get compiled away with -O flags"""
+    if not assertion:
+        raise exception_class(msg)
+
+
 def first(x):
     "returns the first element in an collection of things"
     if x is None:
         return x
     try:
-        if isinstance(x, dict):
-            return list(x.items())[0]
         return x[0]
-    except (ValueError, IndexError):
+    except IndexError:
         return None
+    except (ValueError, KeyError):
+        raise
 
 
 def merge(*dict_list):
@@ -63,6 +70,9 @@ def _shell_escape(string):
         >>> _shell_escape('"')
         '\\\\"'
     """
+
+    ensure(string is not None, "a string is required", TypeError)
+
     for char in ('"', "$", "`"):
         string = string.replace(char, r"\%s" % char)
     return string
@@ -81,10 +91,7 @@ def shell_wrap_command(command):
     escaped_command = _shell_escape(command)
     escaped_wrapped_command = '"%s"' % escaped_command
 
-    space = " "
-    final_command = shell_prefix + space + escaped_wrapped_command
-
-    return final_command
+    return "%s %s" % (shell_prefix, escaped_wrapped_command)
 
 
 def sudo_wrap_command(command):
@@ -94,21 +101,21 @@ def sudo_wrap_command(command):
     # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L374-L376
     # note: differs from Fabric. they support interactive input of password, users and groups
     # we use it exclusively to run commands as root
+
     sudo_prefix = "sudo --non-interactive"
-    space = " "
-    return sudo_prefix + space + command
+    return "%s %s" % (sudo_prefix, command)
 
 
-def pwd_wrap_command(command, working_dir):
+def cwd_wrap_command(command, working_dir):
     "adds a 'cd' prefix to command"
+
     prefix = 'cd "%s" &&' % working_dir
-    space = " "
-    return prefix + space + command
+    return "%s %s" % (prefix, command)
 
 
 def isint(x):
     try:
         int(x)
         return True
-    except:
+    except BaseException:
         return False
