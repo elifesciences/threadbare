@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.7.4" />
+<title>threadbare.execute API documentation</title>
+<meta name="description" content="" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{font-weight:bold}#index h4 + ul{margin-bottom:.6em}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>threadbare.execute</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import copy
+from multiprocessing import Process, Queue
+import time
+from .common import first
+from . import state
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L148-L161
+def serial(func, pool_size=None):
+    &#34;&#34;&#34;Forces the given function to run `pool_size` times.
+    when pool_size is None (default), executor decides how many instances of `func` to execute (1, probably).
+    if set and executor is given a set of values to use instead, `pool_size` is ignored&#34;&#34;&#34;
+
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    inner.pool_size = pool_size
+    return inner
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L164-L194
+def parallel(func, pool_size=None):
+    &#34;&#34;&#34;Forces the wrapped function to run in parallel, instead of sequentially.&#34;&#34;&#34;
+    wrapped_func = serial(func, pool_size)
+    # `func` *must* be forced to run in parallel to main process
+    wrapped_func.parallel = True
+    return wrapped_func
+
+
+def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
+    &#34;&#34;&#34;this function is executed in another process. it wraps the given `worker_func`, initialising the `state.ENV` of
+    the new process and adds its results to the given `queue`&#34;&#34;&#34;
+    try:
+        assert isinstance(env, dict), &#34;given environment must be a dictionary&#34;
+
+        # Fabric nukes the child process&#39;s `env` dictionary
+        # - https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L229-L237
+
+        # note: not possible to service stdin when multiprocessing
+        env[&#34;abort_on_prompts&#34;] = True
+
+        # we don&#39;t care what the parent process had when Python copied across it&#39;s state to
+        # execute this `worker_func` in parallel. reset it now. the process is destroyed upon leaving.
+
+        state.DEPTH = 0
+        state.set_defaults(env)
+
+        result = worker_func()
+        queue.put({&#34;name&#34;: name, &#34;result&#34;: result})
+    except BaseException as unhandled_exception:
+        # kept for debugging
+        # import traceback
+        # traceback.print_exc()
+
+        # &#34;Note that exit handlers and finally clauses, etc., will not be executed.&#34;
+        # - https://docs.python.org/2/library/multiprocessing.html#multiprocessing.Process.terminate
+        queue.put({&#34;name&#34;: name, &#34;result&#34;: unhandled_exception})
+
+
+def process_status(running_p):
+    # https://docs.python.org/2/library/multiprocessing.html#process-and-exceptions
+    result = {
+        &#34;pid&#34;: running_p.pid,
+        &#34;name&#34;: running_p.name,
+        &#34;exitcode&#34;: running_p.exitcode,
+        &#34;alive&#34;: running_p.is_alive(),
+        &#34;killed&#34;: False,
+        &#34;kill-signal&#34;: None,
+    }
+    if running_p.exitcode is not None and running_p.exitcode &lt; 0:
+        result[&#34;killed&#34;] = True
+        result[&#34;kill-signal&#34;] = -running_p.exitcode
+    return result
+
+
+def _parallel_execution(env, func, param_key, param_values, return_process_pool=False):
+    &#34;executes the given function in parallel to main process. blocks until processes are complete&#34;
+    results_q = Queue()
+    kwargs = {
+        #&#39;env&#39;: ..., # each process will get a new state dictionary
+        &#34;worker_func&#34;: func,
+        #&#39;name&#39;: ..., # a name is assigned on process start
+        &#34;queue&#34;: results_q,
+    }
+    pool_size = getattr(func, &#34;pool_size&#34;, None)
+    pool_size = pool_size if pool_size is not None else 1
+    pool_values = param_values or range(0, pool_size)
+
+    pool = []
+    for idx, nth_val in enumerate(pool_values):
+        kwargs[&#34;name&#34;] = &#34;process--&#34; + str(idx + 1)  # process--1, process--2
+        new_env = {} if not env else copy.deepcopy(env)
+
+        # ssh clients are not shared between processes
+        if &#34;ssh_client&#34; in new_env:
+            del new_env[&#34;ssh_client&#34;]
+
+        if param_key:
+            new_env[param_key] = nth_val
+
+        new_env[&#34;parallel&#34;] = True
+        # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L223-L227
+        # new_env[&#39;linewise&#39;] = True # not set until needed
+
+        kwargs[&#34;env&#34;] = new_env
+        p = Process(
+            name=kwargs[&#34;name&#34;],
+            target=_parallel_execution_worker_wrapper,
+            kwargs=kwargs,
+        )
+        p.start()
+        pool.append(p)
+
+    if return_process_pool:
+        # don&#39;t poll for results, don&#39;t wait to finish, just return the list of running processes
+        return results_q, pool
+
+    result_map = {}  # {process-name: process-results, ...}
+
+    # poll the processes until all are complete
+    # remove process from pool when it is complete
+    while len(pool) &gt; 0:
+        for idx, running_p in enumerate(pool):
+            result = process_status(running_p)
+            if not result[&#34;alive&#34;]:
+                result_map[result[&#34;name&#34;]] = result
+                del pool[idx]
+        # introduces the slightest of delays so that we&#39;re not manically polling every microsecond
+        time.sleep(0.1)
+
+    # all processes are complete
+    # empty the queue and marry the results to their process results using their &#39;name&#39;
+
+    while not results_q.empty():
+        job_result = results_q.get()
+        job_name = job_result[&#34;name&#34;]
+        result_map[job_name][&#34;result&#34;] = job_result[&#34;result&#34;]
+
+    results_q.close()
+
+    # sort the results, drop the process name
+    return [b for a, b in sorted(result_map.items(), key=first)]
+
+
+def _serial_execution(func, param_key, param_values):
+    &#34;executes the given function serially&#34;
+    result_list = []
+    if param_key and param_values:
+        for x in param_values:
+            with state.settings(**{param_key: x}):
+                result_list.append(func())
+    else:
+        # pretty boring :(
+        # I could set &#39;_idx&#39; or something in `state.ENV` I suppose ..
+        for _ in range(0, getattr(func, &#34;pool_size&#34;, 1)):
+            result_list.append(func())
+    return result_list
+
+
+def execute(func, param_key=None, param_values=None):
+    &#34;&#34;&#34;inspects a given function and then executes it either serially or in another process using Python&#39;s `multiprocessing` module.
+    `param` and `param_list` control the number of processes spawned and the name of the parameter passed to the function.
+
+    For example:
+
+        execute({}, somefunc, param_key=&#39;host&#39;, param_values=[&#39;127.0.0.1&#39;, &#39;127.0.1.1&#39;, &#39;localhost&#39;])
+
+    will ensure that `somefunc` has the (local) state property &#39;host&#39; with a value of one of the above when executed.
+
+    `param` and `param_list` are optional, but if one is specified then so must the other.
+
+    parent process blocks until all child processes have completed.
+    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;&#34;&#34;&#34;
+
+    # in Fabric, `execute` is a guard-type function that ensures the function and the function&#39;s environment is
+    # correct before passing it to `_execute` that does the actual magic.
+    # `execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L372-L401
+    # `_execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L213-L277
+
+    # Fabric&#39;s custom &#39;JobQueue&#39; adds complexity but can be avoided:
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
+
+    if (param_key and param_values is None) or (param_key is None and param_values):
+        raise ValueError(
+            &#34;either a `param_key` AND `param_values` are provided OR neither are provided&#34;
+        )
+
+    if param_values is not None and type(param_values) not in [list, tuple, set]:
+        raise ValueError(
+            &#34;given value for `param_values` must be an iterable type, not %r&#34;
+            % type(param_values)
+        )
+
+    if param_key is not None and not isinstance(param_key, str):
+        raise ValueError(
+            &#34;given value for `param_key` must be a valid function parameter key&#34;
+        )
+
+    if hasattr(func, &#34;parallel&#34;) and func.parallel:
+        result_list = _parallel_execution(state.ENV, func, param_key, param_values)
+        return [result[&#34;result&#34;] for result in result_list]
+    return _serial_execution(func, param_key, param_values)
+
+
+def execute_with_hosts(func, hosts=None):
+    &#34;&#34;&#34;convenience wrapper around `execute`. calls `execute` on given `func` for each host in `hosts`.
+    The host is available within the worker function&#39;s `env` as `host_string`.&#34;&#34;&#34;
+    host_list = hosts or state.ENV.get(&#34;hosts&#34;) or []
+    assert isinstance(host_list, list), &#34;hosts must be a list&#34;
+    # Fabric may know about many hosts (&#39;all_hosts&#39;) but only be acting upon a subset of them (&#39;hosts&#39;)
+    # - https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
+    # set here:
+    # - https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L352
+    # in elife/builder we use a map of host information:
+    # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L326-L327
+    # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
+    # it says &#39;for informational purposes only&#39; and nothing we use depends on it, so I&#39;m disabling for now
+    # env[&#39;all_hosts&#39;] = env[&#39;hosts&#39;]
+    results = execute(func, param_key=&#34;host_string&#34;, param_values=host_list)
+    # results are ordered so we can do this
+    return dict(zip(host_list, results))  # {&#39;192.168.0.1&#39;: [], &#39;192.169.0.3&#39;: []}</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="threadbare.execute.execute"><code class="name flex">
+<span>def <span class="ident">execute</span></span>(<span>func, param_key=None, param_values=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>inspects a given function and then executes it either serially or in another process using Python's <code>multiprocessing</code> module.
+<code>param</code> and <code>param_list</code> control the number of processes spawned and the name of the parameter passed to the function.</p>
+<p>For example:</p>
+<pre><code>execute({}, somefunc, param_key='host', param_values=['127.0.0.1', '127.0.1.1', 'localhost'])
+</code></pre>
+<p>will ensure that <code>somefunc</code> has the (local) state property 'host' with a value of one of the above when executed.</p>
+<p><code>param</code> and <code>param_list</code> are optional, but if one is specified then so must the other.</p>
+<p>parent process blocks until all child processes have completed.
+returns a map of execution data with the return values of the individual executions available under 'result'</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def execute(func, param_key=None, param_values=None):
+    &#34;&#34;&#34;inspects a given function and then executes it either serially or in another process using Python&#39;s `multiprocessing` module.
+    `param` and `param_list` control the number of processes spawned and the name of the parameter passed to the function.
+
+    For example:
+
+        execute({}, somefunc, param_key=&#39;host&#39;, param_values=[&#39;127.0.0.1&#39;, &#39;127.0.1.1&#39;, &#39;localhost&#39;])
+
+    will ensure that `somefunc` has the (local) state property &#39;host&#39; with a value of one of the above when executed.
+
+    `param` and `param_list` are optional, but if one is specified then so must the other.
+
+    parent process blocks until all child processes have completed.
+    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;&#34;&#34;&#34;
+
+    # in Fabric, `execute` is a guard-type function that ensures the function and the function&#39;s environment is
+    # correct before passing it to `_execute` that does the actual magic.
+    # `execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L372-L401
+    # `_execute`: https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L213-L277
+
+    # Fabric&#39;s custom &#39;JobQueue&#39; adds complexity but can be avoided:
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/job_queue.py
+
+    if (param_key and param_values is None) or (param_key is None and param_values):
+        raise ValueError(
+            &#34;either a `param_key` AND `param_values` are provided OR neither are provided&#34;
+        )
+
+    if param_values is not None and type(param_values) not in [list, tuple, set]:
+        raise ValueError(
+            &#34;given value for `param_values` must be an iterable type, not %r&#34;
+            % type(param_values)
+        )
+
+    if param_key is not None and not isinstance(param_key, str):
+        raise ValueError(
+            &#34;given value for `param_key` must be a valid function parameter key&#34;
+        )
+
+    if hasattr(func, &#34;parallel&#34;) and func.parallel:
+        result_list = _parallel_execution(state.ENV, func, param_key, param_values)
+        return [result[&#34;result&#34;] for result in result_list]
+    return _serial_execution(func, param_key, param_values)</code></pre>
+</details>
+</dd>
+<dt id="threadbare.execute.execute_with_hosts"><code class="name flex">
+<span>def <span class="ident">execute_with_hosts</span></span>(<span>func, hosts=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>convenience wrapper around <a title="threadbare.execute.execute" href="#threadbare.execute.execute"><code>execute()</code></a>. calls <a title="threadbare.execute.execute" href="#threadbare.execute.execute"><code>execute()</code></a> on given <code>func</code> for each host in <code>hosts</code>.
+The host is available within the worker function's <code>env</code> as <code>host_string</code>.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def execute_with_hosts(func, hosts=None):
+    &#34;&#34;&#34;convenience wrapper around `execute`. calls `execute` on given `func` for each host in `hosts`.
+    The host is available within the worker function&#39;s `env` as `host_string`.&#34;&#34;&#34;
+    host_list = hosts or state.ENV.get(&#34;hosts&#34;) or []
+    assert isinstance(host_list, list), &#34;hosts must be a list&#34;
+    # Fabric may know about many hosts (&#39;all_hosts&#39;) but only be acting upon a subset of them (&#39;hosts&#39;)
+    # - https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
+    # set here:
+    # - https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L352
+    # in elife/builder we use a map of host information:
+    # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L326-L327
+    # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
+    # it says &#39;for informational purposes only&#39; and nothing we use depends on it, so I&#39;m disabling for now
+    # env[&#39;all_hosts&#39;] = env[&#39;hosts&#39;]
+    results = execute(func, param_key=&#34;host_string&#34;, param_values=host_list)
+    # results are ordered so we can do this
+    return dict(zip(host_list, results))  # {&#39;192.168.0.1&#39;: [], &#39;192.169.0.3&#39;: []}</code></pre>
+</details>
+</dd>
+<dt id="threadbare.execute.parallel"><code class="name flex">
+<span>def <span class="ident">parallel</span></span>(<span>func, pool_size=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>Forces the wrapped function to run in parallel, instead of sequentially.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parallel(func, pool_size=None):
+    &#34;&#34;&#34;Forces the wrapped function to run in parallel, instead of sequentially.&#34;&#34;&#34;
+    wrapped_func = serial(func, pool_size)
+    # `func` *must* be forced to run in parallel to main process
+    wrapped_func.parallel = True
+    return wrapped_func</code></pre>
+</details>
+</dd>
+<dt id="threadbare.execute.process_status"><code class="name flex">
+<span>def <span class="ident">process_status</span></span>(<span>running_p)</span>
+</code></dt>
+<dd>
+<section class="desc"></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def process_status(running_p):
+    # https://docs.python.org/2/library/multiprocessing.html#process-and-exceptions
+    result = {
+        &#34;pid&#34;: running_p.pid,
+        &#34;name&#34;: running_p.name,
+        &#34;exitcode&#34;: running_p.exitcode,
+        &#34;alive&#34;: running_p.is_alive(),
+        &#34;killed&#34;: False,
+        &#34;kill-signal&#34;: None,
+    }
+    if running_p.exitcode is not None and running_p.exitcode &lt; 0:
+        result[&#34;killed&#34;] = True
+        result[&#34;kill-signal&#34;] = -running_p.exitcode
+    return result</code></pre>
+</details>
+</dd>
+<dt id="threadbare.execute.serial"><code class="name flex">
+<span>def <span class="ident">serial</span></span>(<span>func, pool_size=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>Forces the given function to run <code>pool_size</code> times.
+when pool_size is None (default), executor decides how many instances of <code>func</code> to execute (1, probably).
+if set and executor is given a set of values to use instead, <code>pool_size</code> is ignored</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def serial(func, pool_size=None):
+    &#34;&#34;&#34;Forces the given function to run `pool_size` times.
+    when pool_size is None (default), executor decides how many instances of `func` to execute (1, probably).
+    if set and executor is given a set of values to use instead, `pool_size` is ignored&#34;&#34;&#34;
+
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    inner.pool_size = pool_size
+    return inner</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="threadbare" href="index.html">threadbare</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="threadbare.execute.execute" href="#threadbare.execute.execute">execute</a></code></li>
+<li><code><a title="threadbare.execute.execute_with_hosts" href="#threadbare.execute.execute_with_hosts">execute_with_hosts</a></code></li>
+<li><code><a title="threadbare.execute.parallel" href="#threadbare.execute.parallel">parallel</a></code></li>
+<li><code><a title="threadbare.execute.process_status" href="#threadbare.execute.process_status">process_status</a></code></li>
+<li><code><a title="threadbare.execute.serial" href="#threadbare.execute.serial">serial</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>

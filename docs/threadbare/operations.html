@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.7.4" />
+<title>threadbare.operations API documentation</title>
+<meta name="description" content="" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{font-weight:bold}#index h4 + ul{margin-bottom:.6em}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>threadbare.operations</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import tempfile
+import contextlib
+import subprocess
+from threading import Timer
+import getpass
+from pssh import exceptions as pssh_exceptions
+import os, sys
+from . import state
+from .common import (
+    PromptedException,
+    merge,
+    subdict,
+    rename,
+    cwd,
+    sudo_wrap_command,
+    cwd_wrap_command,
+    shell_wrap_command,
+)
+from pssh.clients.native import SSHClient as PSSHClient
+import logging
+
+LOG = logging.getLogger(__name__)
+
+
+class SSHClient(PSSHClient):
+    def __deepcopy__(self, memo):
+        # do not copy.deepcopy ourselves or the pssh SSHClient object, just
+        # return a reference to the object (self)
+        # - https://docs.python.org/3/library/copy.html
+        return self
+
+
+class NetworkError(BaseException):
+    &#34;&#34;&#34;generic &#39;died while doing something ssh-related&#39; catch-all exception class.
+    calling str() on this exception will return the results of calling str() on the
+    wrapped exception.&#34;&#34;&#34;
+
+    def __init__(self, wrapped_exception_inst):
+        self.wrapped = wrapped_exception_inst
+
+    def __str__(self):
+        # we have the opportunity here to tweak the error messages to make them
+        # similar to their equivalents in Fabric.
+        # original error messages are still available via `str(excinst.wrapped)`
+        space = &#34; &#34;
+        custom_error_prefixes = {
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
+            pssh_exceptions.Timeout: &#34;Timed out trying to connect.&#34;,
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
+            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
+            pssh_exceptions.SSHException: &#34;Low level socket error connecting to host.&#34;,
+            pssh_exceptions.SessionError: &#34;Low level socket error connecting to host.&#34;,
+            pssh_exceptions.ConnectionErrorException: &#34;Low level socket error connecting to host.&#34;,
+        }
+        new_error = custom_error_prefixes.get(type(self.wrapped)) or &#34;&#34;
+        original_error = str(self.wrapped)
+        return new_error + space + original_error
+
+
+def pem_key():
+    &#34;&#34;&#34;returns the first private key found in a list of common private keys.
+    if none of the keys exist, the default (first) key will be returned.&#34;&#34;&#34;
+    id_list = [&#34;id_rsa&#34;, &#34;id_dsa&#34;, &#34;identity&#34;, &#34;id_ecdsa&#34;]
+    id_list = [os.path.expanduser(&#34;~/.ssh/&#34; + idstr) for idstr in id_list]
+    for id_path in id_list:
+        if os.path.isfile(id_path):
+            return id_path
+        LOG.debug(&#34;key not found: %s&#34; % id_path)
+
+    default = id_list[0]
+    return default
+
+
+def handle(base_kwargs, kwargs):
+    &#34;&#34;&#34;handles the merging of the base set of function keyword arguments and their possible overrides.
+    `base_kwargs` is a map of the function&#39;s keyword arguments and their defaults.
+    `kwargs` are the keyword arguments used when executing the function.
+
+    the keys from `base_kwargs` are used to determine which keys to extract from the `kwargs` and any
+    global settings.
+
+    returns a triple of (`global_kwargs`, `user_kwargs`, `final_kwargs`) where
+    `global_kwargs` is the subset of keyword arguments extracted from `state.env`,
+    `user_kwargs` is the subset of keyword arguments extracted from the given kwargs and
+    `final_kwargs` is the result of merging `base_kwargs` &lt;- `global_kwargs` &lt;- `user_kwargs`
+
+    &#39;user&#39; keyword arguments that are explicitly passed in take precedence over all others and
+    &#39;global&#39; keyword arguments take precedence over the function&#39;s defaults kwargs.&#34;&#34;&#34;
+    key_list = base_kwargs.keys()
+    global_kwargs = subdict(state.ENV, key_list)
+    user_kwargs = subdict(kwargs, key_list)
+    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+    return global_kwargs, user_kwargs, final_kwargs
+
+
+# api
+
+
+@contextlib.contextmanager
+def lcd(local_dir):
+    &#34;temporarily changes the local working directory&#34;
+    assert os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir
+    with state.settings():
+        current_dir = cwd()
+        state.add_cleanup(lambda: os.chdir(current_dir))
+        os.chdir(local_dir)
+        yield
+
+
+@contextlib.contextmanager
+def rcd(remote_working_dir):
+    &#34;ensures all commands run are done from the given remote directory. if remote directory doesn&#39;t exist, command will not be run&#34;
+    with state.settings(remote_working_dir=remote_working_dir):
+        yield
+
+
+@contextlib.contextmanager
+def hide(what=None):
+    &#34;hides *all* output, regardless of `what` type of output is to be hidden.&#34;
+    with state.settings(quiet=True):
+        yield
+
+
+def _ssh_client(**kwargs):
+    &#34;&#34;&#34;returns an instance of pssh.clients.native.SSHClient
+    if within a state context, looks for a client already in use and returns that if found.
+    if not found, creates a new one and stores it for later use.&#34;&#34;&#34;
+
+    # parameters we&#39;re interested in and their default values
+    base_kwargs = {
+        # current user. sensible default but probably not what you want
+        &#34;user&#34;: getpass.getuser(),
+        &#34;host_string&#34;: None,
+        # looks for the same ~4 possible keys as Fabric and ParallelSSH.
+        # uses the first one it finds or the most common if none found.
+        &#34;key_filename&#34;: pem_key(),
+        &#34;port&#34;: 22,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    final_kwargs[&#34;password&#34;] = None  # always private keys
+    rename(final_kwargs, [(&#34;key_filename&#34;, &#34;pkey&#34;), (&#34;host_string&#34;, &#34;host&#34;)])
+
+    # if we&#39;re not using global state, return the new client as-is
+    env = state.ENV
+    if env.read_only:
+        return SSHClient(**final_kwargs)
+
+    client_map_key = &#34;ssh_client&#34;
+    client_key = subdict(final_kwargs, [&#34;user&#34;, &#34;host&#34;, &#34;pkey&#34;, &#34;port&#34;, &#34;timeout&#34;])
+    client_key = tuple(sorted(client_key.items()))
+
+    # otherwise, check to see if a previous client is available for this host
+    client_map = env.get(client_map_key, {})
+    if client_key in client_map:
+        return client_map[client_key]
+
+    # if not, create a new one and store it in the state
+
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient
+    client = SSHClient(**final_kwargs)
+
+    # disconnect session when leaving context manager
+    state.add_cleanup(lambda: client.disconnect())
+
+    client_map[client_key] = client
+    env[client_map_key] = client_map
+
+    return client
+
+
+def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
+    &#34;&#34;&#34;creates an SSHClient object and executes given `command` with the given parameters.&#34;&#34;&#34;
+    client = _ssh_client(
+        user=user, host_string=host_string, key_filename=key_filename, port=port
+    )
+
+    shell = False  # handled ourselves
+    sudo = False  # handled ourselves
+    user = None  # user to sudo to
+    encoding = &#34;utf-8&#34;  # used everywhere
+
+    try:
+        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
+        channel, host_string, stdout, stderr, stdin = client.run_command(
+            command, sudo, user, use_pty, shell, encoding, timeout
+        )
+
+        def get_exit_code():
+            client.wait_finished(channel)
+            return channel.get_exit_status()
+
+        return {
+            # defer executing as it consumes output entirely before returning. this
+            # removes our chance to display/transform output as it is streamed to us
+            &#34;return_code&#34;: get_exit_code,
+            &#34;command&#34;: command,
+            &#34;stdout&#34;: stdout,
+            &#34;stderr&#34;: stderr,
+        }
+    except BaseException as ex:
+        # *probably* a network error:
+        # - https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
+        raise NetworkError(ex)
+
+
+def _print_line(output_pipe, quiet, discard_output, line):
+    &#34;&#34;&#34;writes the given `line` (string) to the given `output_pipe` (file-like object)
+    if `quiet` is True, `line` is *not* written to `output_pipe`.
+    if `discard_output` is True, `line` is not returned and output is not accumulated in memory&#34;&#34;&#34;
+    if not quiet:
+        output_pipe.write(line + &#34;\n&#34;)
+    if not discard_output:
+        return line
+
+
+def _process_output(output_pipe, result_list, quiet, discard_output):
+    &#34;calls `_print_line` on each result in `result_list`.&#34;
+    kwargs = subdict(locals(), [&#34;quiet&#34;, &#34;discard_output&#34;])
+
+    # always process the results as soon as we have them
+    # use `quiet` to hide the printing of output to stdout/stderr
+    # use `discard_output` to discard the results as soon as they are read
+    # stderr may be empty if `combine_stderr` in `remote` was `True`
+    new_results = [
+        _print_line(output_pipe, line=line, **kwargs) for line in result_list
+    ]
+    output_pipe.flush()
+    if not kwargs[&#34;discard_output&#34;]:
+        return new_results
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L898-L901
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L975
+def remote(command, **kwargs):
+    &#34;preprocesses given `command` and options before sending it to `_execute` to be executed on remote host&#34;
+
+    # Fabric function signature for `run`
+    # shell=True # done
+    # pty=True   # mutually exclusive with `combine_stderr` in pssh. not sure how Fabric/Paramiko is doing it
+    # combine_stderr=None # mutually exclusive with use_pty. &#39;True&#39; in global env.
+    # quiet=False, # done
+    # warn_only=False # done
+    # stdout=None # done, stdout/stderr always available unless explicitly discarded. &#39;see discard_output&#39;
+    # stderr=None # done, stderr not available when combine_stderr is `True`
+    # timeout=None # done
+    # shell_escape=None # ignored. shell commands are always escaped
+    # capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
+
+    # parameters we&#39;re interested in and their default values
+    base_kwargs = {
+        # current user. sensible default but probably not what you want
+        &#34;user&#34;: getpass.getuser(),
+        &#34;host_string&#34;: None,
+        &#34;key_filename&#34;: os.path.expanduser(&#34;~/.ssh/id_rsa&#34;),
+        &#34;port&#34;: 22,
+        &#34;use_shell&#34;: True,
+        &#34;use_sudo&#34;: False,
+        &#34;combine_stderr&#34;: True,
+        &#34;quiet&#34;: False,
+        &#34;discard_output&#34;: False,
+        &#34;remote_working_dir&#34;: None,
+        &#34;timeout&#34;: None,
+        &#34;warn_only&#34;: False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        &#34;abort_exception&#34;: RuntimeError,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # wrap the command up
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
+    if final_kwargs[&#34;remote_working_dir&#34;]:
+        command = cwd_wrap_command(command, final_kwargs[&#34;remote_working_dir&#34;])
+    if final_kwargs[&#34;use_shell&#34;]:
+        command = shell_wrap_command(command)
+    if final_kwargs[&#34;use_sudo&#34;]:
+        command = sudo_wrap_command(command)
+
+    # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
+    # - https://parallel-ssh.readthedocs.io/en/latest/advanced.html#combined-stdout-stderr
+    use_pty = final_kwargs[&#34;combine_stderr&#34;]
+
+    # values `remote` specifically passes to `_execute`
+    execute_kwargs = {&#34;command&#34;: command, &#34;use_pty&#34;: use_pty}
+    execute_kwargs = merge(final_kwargs, execute_kwargs)
+    execute_kwargs = subdict(
+        execute_kwargs,
+        [
+            &#34;command&#34;,
+            &#34;user&#34;,
+            &#34;key_filename&#34;,
+            &#34;host_string&#34;,
+            &#34;port&#34;,
+            &#34;use_pty&#34;,
+            &#34;timeout&#34;,
+        ],
+    )
+
+    # TODO: validate `_execute`s args. `host_string` can&#39;t be None for example
+
+    # run command
+    result = _execute(**execute_kwargs)
+
+    # handle stdout/stderr streams
+    output_kwargs = subdict(final_kwargs, [&#34;quiet&#34;, &#34;discard_output&#34;])
+    stdout = _process_output(sys.stdout, result[&#34;stdout&#34;], **output_kwargs)
+    stderr = _process_output(sys.stderr, result[&#34;stderr&#34;], **output_kwargs)
+
+    # command must have finished before we have access to return code
+    return_code = result[&#34;return_code&#34;]()
+    result.update(
+        {
+            &#34;stdout&#34;: stdout,
+            &#34;stderr&#34;: stderr,
+            &#34;return_code&#34;: return_code,
+            &#34;failed&#34;: return_code &gt; 0,
+            &#34;succeeded&#34;: return_code == 0,
+        }
+    )
+
+    if result[&#34;succeeded&#34;]:
+        return result
+
+    err_msg = &#34;remote() encountered an error (return code %s) while executing %r&#34; % (
+        result[&#34;return_code&#34;],
+        command,
+    )
+
+    if final_kwargs[&#34;warn_only&#34;]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, &#34;result&#34;, result)
+
+    raise exc
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
+def remote_sudo(command, **kwargs):
+    &#34;exactly the same as `remote`, but the given command is run as the root user&#34;
+    # user=None  # ignore
+    # group=None # ignore
+    kwargs[&#34;use_sudo&#34;] = True
+    return remote(command, **kwargs)
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/contrib/files.py#L15
+def remote_file_exists(path, **kwargs):
+    &#34;returns True if given path exists on remote system&#34;
+    # note: Fabric is doing something weird and clever here:
+    # - https://github.com/mathiasertl/fabric/blob/master/fabric/contrib/files.py#L474-L485
+    # but their examples don&#39;t work:
+
+    # $ /bin/sh
+    # sh-5.0$ foo=&#34;$(echo /usr/\*/share)&#34;
+    # sh-5.0$ echo $foo
+    # /usr/*/share
+    # sh-5.0$ exit
+    # $ echo $SHELL
+    # $ /bin/bash
+    # $ foo=&#34;$(echo /usr/\*/share)&#34;
+    # $ echo $foo
+    # /usr/*/share
+
+    # TODO: revisit
+    # update 2020/01: it does work, I just had no &#34;/usr/[anything]/share&#34; directories.
+    # this works for me:
+    #   foo=$(echo /\*/share/)
+    #   echo $foo
+    #   /usr/share/
+
+    base_kwargs = {
+        &#34;use_sudo&#34;: False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # do not raise an exception if remote file doesn&#39;t exist
+    final_kwargs[&#34;warn_only&#34;] = True
+
+    remote_fn = remote_sudo if final_kwargs[&#34;use_sudo&#34;] else remote
+    command = &#34;test -e %s&#34; % path
+    return remote_fn(command, **final_kwargs)[&#34;return_code&#34;] == 0
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1157
+def local(command, **kwargs):
+    &#34;preprocesses given `command` and options before executing it locally using Python&#39;s `subprocess.Popen`&#34;
+    base_kwargs = {
+        &#34;use_shell&#34;: True,
+        &#34;combine_stderr&#34;: True,
+        &#34;capture&#34;: False,
+        &#34;timeout&#34;: None,
+        &#34;quiet&#34;: False,
+        &#34;warn_only&#34;: False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        &#34;abort_exception&#34;: RuntimeError,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # TODO: once py2 support has been dropped, move this back to file head
+    devnull_opened = False
+    try:
+        from subprocess import DEVNULL  # py3
+    except ImportError:
+        devnull_opened = True
+        DEVNULL = open(os.devnull, &#34;wb&#34;)
+
+    if final_kwargs[&#34;capture&#34;]:
+        if final_kwargs[&#34;combine_stderr&#34;]:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.STDOUT
+        else:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.PIPE
+    else:
+        if final_kwargs[&#34;quiet&#34;]:
+            # we&#39;re not capturing and we&#39;ve been told to be quiet
+            # send everything to /dev/null
+            out_stream = DEVNULL
+            err_stream = DEVNULL
+        else:
+            out_stream = None
+            err_stream = None
+
+    if not final_kwargs[&#34;use_shell&#34;] and not isinstance(command, list):
+        raise ValueError(&#34;when shell=False, given command *must* be a list&#34;)
+
+    if final_kwargs[&#34;use_shell&#34;]:
+        command = shell_wrap_command(command)
+
+    proc = subprocess.Popen(
+        command, shell=final_kwargs[&#34;use_shell&#34;], stdout=out_stream, stderr=err_stream
+    )
+    if final_kwargs[&#34;timeout&#34;]:
+        timer = Timer(final_kwargs[&#34;timeout&#34;], proc.kill)
+        try:
+            timer.start()  # proximity matters
+            stdout, stderr = proc.communicate()
+        finally:
+            timer.cancel()
+    else:
+        stdout, stderr = proc.communicate()
+
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1240-L1244
+    result = {
+        &#34;return_code&#34;: proc.returncode,
+        &#34;failed&#34;: proc.returncode != 0,
+        &#34;succeeded&#34;: proc.returncode == 0,
+        &#34;command&#34;: command,
+        &#34;stdout&#34;: (stdout or b&#34;&#34;).decode(&#34;utf-8&#34;).splitlines(),
+        &#34;stderr&#34;: (stderr or b&#34;&#34;).decode(&#34;utf-8&#34;).splitlines(),
+    }
+
+    if devnull_opened:
+        DEVNULL.close()
+
+    if result[&#34;succeeded&#34;]:
+        return result
+
+    err_msg = &#34;local() encountered an error (return code %s) while executing %r&#34; % (
+        result[&#34;return_code&#34;],
+        command,
+    )
+
+    if final_kwargs[&#34;warn_only&#34;]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, &#34;result&#34;, result)
+
+    raise exc
+
+
+def single_command(cmd_list):
+    &#34;given a list of commands to run, returns a single command.&#34;
+    # `remote` and `local` will do any escaping as necessary
+    if cmd_list in [None, []]:
+        return None
+    return &#34; &amp;&amp; &#34;.join(map(str, cmd_list))
+
+
+def prompt(msg):
+    &#34;&#34;&#34;issues a prompt for input.
+    raises a `PromptedException` if `abort_on_prompts` in `state.ENV` is `True` or executing within
+    another process using `execute.parallel` where input can&#39;t be supplied.
+    if `abort_exception` is set in `state.ENV`, then that exception is raised instead&#34;&#34;&#34;
+    if state.ENV.get(&#34;abort_on_prompts&#34;, False):
+        abort_ex = state.ENV.get(&#34;abort_exception&#34;, PromptedException)
+        raise abort_ex(&#34;prompted with: %s&#34; % (msg,))
+    print(msg)
+    try:
+        return raw_input(&#34;&gt; &#34;)
+    except NameError:
+        return input(&#34;&gt; &#34;)
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
+# use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
+def _download_as_root_hack(remote_path, local_path, **kwargs):
+    &#34;&#34;&#34;as root, creates a temporary copy of the file that can be downloaded by a
+    regular user and then removes the temporary file.
+    warning: don&#39;t try to download anything huge `with_sudo` as the file is duplicated.
+    warning: the privileged file will be available in /tmp until the download is complete&#34;&#34;&#34;
+
+    if not remote_file_exists(remote_path, use_sudo=True, **kwargs):
+        raise EnvironmentError(&#34;remote file does not exist: %s&#34; % (remote_path,))
+    client = _ssh_client(**kwargs)
+
+    cmd = single_command(
+        [
+            # create a temporary file with the suffix &#39;-threadbare&#39;
+            &#39;tempfile=$(mktemp --suffix &#34;-threadbare&#34;)&#39;,
+            # copy the target file to this temporary file
+            &#39;cp &#34;%s&#34; &#34;$tempfile&#34;&#39; % remote_path,
+            # ensure it&#39;s readable by the user doing the downloading
+            &#39;chmod +r &#34;$tempfile&#34;&#39;,
+            # emit the name of the temporary file so we can find it to download it
+            &#39;echo &#34;$tempfile&#34;&#39;,
+        ]
+    )
+    result = remote_sudo(cmd, **kwargs)
+    remote_tempfile = result[&#34;stdout&#34;][-1]
+    # assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
+    remote_path = remote_tempfile
+    client.copy_remote_file(remote_tempfile, local_path)
+    remote_sudo(&#39;rm &#34;%s&#34;&#39; % remote_tempfile, **kwargs)
+    return local_path
+
+
+# https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
+# use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
+def download(remote_path, local_path, use_sudo=False, **kwargs):
+    &#34;&#34;&#34;downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
+    avoid `use_sudo` if at all possible&#34;&#34;&#34;
+
+    # TODO: support an &#39;overwrite?&#39; option?
+
+    with state.settings(quiet=True):
+        if remote_path.endswith(&#34;/&#34;):
+            raise ValueError(&#34;directory downloads are not supported&#34;)
+
+        # do not raise an exception if remote file doesn&#39;t exist
+        result = remote(&#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True)
+        remote_path_is_dir = result[&#34;succeeded&#34;]
+        if remote_path_is_dir:
+            raise ValueError(&#34;directory downloads are not supported&#34;)
+
+        temp_file, bytes_buffer = None, None
+        if hasattr(local_path, &#34;read&#34;):
+            # given a file-like object to download file into.
+            # 1. write the remote file to local temporary file
+            # 2. read temporary file into the given buffer
+            # 3. delete the temporary file
+
+            bytes_buffer = local_path
+            temp_file, local_path = tempfile.mkstemp(suffix=&#34;-threadbare&#34;)
+
+        if not os.path.isabs(local_path):
+            local_path = os.path.abspath(local_path)
+
+        if os.path.isdir(local_path):
+            local_path = os.path.join(local_path, os.path.basename(remote_path))
+
+        if use_sudo:
+            local_path = _download_as_root_hack(remote_path, local_path, **kwargs)
+
+        else:
+            if not remote_file_exists(remote_path, **kwargs):
+                raise EnvironmentError(
+                    &#34;remote file does not exist: %s&#34; % (remote_path,)
+                )
+            client = _ssh_client(**kwargs)
+            client.copy_remote_file(remote_path, local_path)
+
+        if temp_file:
+            bytes_buffer.write(open(local_path, &#34;rb&#34;).read())
+            os.unlink(local_path)
+            return bytes_buffer
+
+        return local_path
+
+
+def _upload_as_root_hack(local_path, remote_path, **kwargs):
+    &#34;&#34;&#34;uploads file at `local_path` to a remote temporary file then moves the file to `remote_path` as root.
+    does not alter any permissions or attributes on the file&#34;&#34;&#34;
+
+    client = _ssh_client(**kwargs)
+
+    cmd = single_command(
+        [
+            # create a temporary file with the suffix &#39;-threadbare&#39;
+            &#39;tempfile=$(mktemp --suffix &#34;-threadbare&#34;)&#39;,
+            &#39;echo &#34;$tempfile&#34;&#39;,
+        ]
+    )
+    result = remote(cmd, **kwargs)
+    remote_temp_path = result[&#34;stdout&#34;][-1]
+    assert remote_file_exists(remote_temp_path, **kwargs)  # sanity check
+
+    client.copy_file(local_path, remote_temp_path)
+    move_file_into_place = &#39;mv &#34;%s&#34; &#34;%s&#34;&#39; % (remote_temp_path, remote_path)
+    remote_sudo(move_file_into_place, **kwargs)
+    assert remote_file_exists(remote_path, use_sudo=True, **kwargs)
+
+
+def _write_bytes_to_temporary_file(local_path):
+    &#34;&#34;&#34;if `local_path` is a file-like object, write the contents to an *actual* file and
+    return a pair of new local filename and a function that removes the temporary file when called.&#34;&#34;&#34;
+    if hasattr(local_path, &#34;read&#34;):
+        # `local_path` is a file-like object
+        local_bytes = local_path
+        local_bytes.seek(0)  # reset internal pointer
+        temp_file, local_path = tempfile.mkstemp(suffix=&#34;-threadbare&#34;)
+        with os.fdopen(temp_file, &#34;wb&#34;) as fh:
+            fh.write(local_bytes.getvalue())
+        cleanup = lambda: os.unlink(local_path)
+        return local_path, cleanup
+    return local_path, None
+
+
+def upload(local_path, remote_path, use_sudo=False, **kwargs):
+    &#34;uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path&#34;
+    with state.settings(quiet=True):
+
+        # bytes handling
+        local_path, cleanup_fn = _write_bytes_to_temporary_file(local_path)
+        if cleanup_fn:
+            state.add_cleanup(cleanup_fn)
+
+        if os.path.isdir(local_path):
+            raise ValueError(&#34;folders cannot be uploaded&#34;)
+
+        if use_sudo:
+            return _upload_as_root_hack(local_path, remote_path, **kwargs)
+
+        if not os.path.exists(local_path):
+            raise EnvironmentError(&#34;local file does not exist: %s&#34; % (local_path,))
+
+        # you&#39;re not crazy, sftp is *exceptionally* slow:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        # local(&#39;du -sh %s&#39; % local_path)
+        # client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+        client = _ssh_client(**kwargs)
+        # print(&#39;client&#39;,client)
+        client.copy_file(local_path, remote_path)
+        # client.pool.join()
+        # print(&#39;done&#39;)
+        # client.disconnect()</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="threadbare.operations.download"><code class="name flex">
+<span>def <span class="ident">download</span></span>(<span>remote_path, local_path, use_sudo=False, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>downloads file at <code>remote_path</code> to <code>local_path</code>, overwriting the local path if it exists.
+avoid <code>use_sudo</code> if at all possible</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def download(remote_path, local_path, use_sudo=False, **kwargs):
+    &#34;&#34;&#34;downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
+    avoid `use_sudo` if at all possible&#34;&#34;&#34;
+
+    # TODO: support an &#39;overwrite?&#39; option?
+
+    with state.settings(quiet=True):
+        if remote_path.endswith(&#34;/&#34;):
+            raise ValueError(&#34;directory downloads are not supported&#34;)
+
+        # do not raise an exception if remote file doesn&#39;t exist
+        result = remote(&#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True)
+        remote_path_is_dir = result[&#34;succeeded&#34;]
+        if remote_path_is_dir:
+            raise ValueError(&#34;directory downloads are not supported&#34;)
+
+        temp_file, bytes_buffer = None, None
+        if hasattr(local_path, &#34;read&#34;):
+            # given a file-like object to download file into.
+            # 1. write the remote file to local temporary file
+            # 2. read temporary file into the given buffer
+            # 3. delete the temporary file
+
+            bytes_buffer = local_path
+            temp_file, local_path = tempfile.mkstemp(suffix=&#34;-threadbare&#34;)
+
+        if not os.path.isabs(local_path):
+            local_path = os.path.abspath(local_path)
+
+        if os.path.isdir(local_path):
+            local_path = os.path.join(local_path, os.path.basename(remote_path))
+
+        if use_sudo:
+            local_path = _download_as_root_hack(remote_path, local_path, **kwargs)
+
+        else:
+            if not remote_file_exists(remote_path, **kwargs):
+                raise EnvironmentError(
+                    &#34;remote file does not exist: %s&#34; % (remote_path,)
+                )
+            client = _ssh_client(**kwargs)
+            client.copy_remote_file(remote_path, local_path)
+
+        if temp_file:
+            bytes_buffer.write(open(local_path, &#34;rb&#34;).read())
+            os.unlink(local_path)
+            return bytes_buffer
+
+        return local_path</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.handle"><code class="name flex">
+<span>def <span class="ident">handle</span></span>(<span>base_kwargs, kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>handles the merging of the base set of function keyword arguments and their possible overrides.
+<code>base_kwargs</code> is a map of the function's keyword arguments and their defaults.
+<code>kwargs</code> are the keyword arguments used when executing the function.</p>
+<p>the keys from <code>base_kwargs</code> are used to determine which keys to extract from the <code>kwargs</code> and any
+global settings.</p>
+<p>returns a triple of (<code>global_kwargs</code>, <code>user_kwargs</code>, <code>final_kwargs</code>) where
+<code>global_kwargs</code> is the subset of keyword arguments extracted from <code>state.env</code>,
+<code>user_kwargs</code> is the subset of keyword arguments extracted from the given kwargs and
+<code>final_kwargs</code> is the result of merging <code>base_kwargs</code> &lt;- <code>global_kwargs</code> &lt;- <code>user_kwargs</code></p>
+<p>'user' keyword arguments that are explicitly passed in take precedence over all others and
+'global' keyword arguments take precedence over the function's defaults kwargs.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def handle(base_kwargs, kwargs):
+    &#34;&#34;&#34;handles the merging of the base set of function keyword arguments and their possible overrides.
+    `base_kwargs` is a map of the function&#39;s keyword arguments and their defaults.
+    `kwargs` are the keyword arguments used when executing the function.
+
+    the keys from `base_kwargs` are used to determine which keys to extract from the `kwargs` and any
+    global settings.
+
+    returns a triple of (`global_kwargs`, `user_kwargs`, `final_kwargs`) where
+    `global_kwargs` is the subset of keyword arguments extracted from `state.env`,
+    `user_kwargs` is the subset of keyword arguments extracted from the given kwargs and
+    `final_kwargs` is the result of merging `base_kwargs` &lt;- `global_kwargs` &lt;- `user_kwargs`
+
+    &#39;user&#39; keyword arguments that are explicitly passed in take precedence over all others and
+    &#39;global&#39; keyword arguments take precedence over the function&#39;s defaults kwargs.&#34;&#34;&#34;
+    key_list = base_kwargs.keys()
+    global_kwargs = subdict(state.ENV, key_list)
+    user_kwargs = subdict(kwargs, key_list)
+    final_kwargs = merge(base_kwargs, global_kwargs, user_kwargs)
+    return global_kwargs, user_kwargs, final_kwargs</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.hide"><code class="name flex">
+<span>def <span class="ident">hide</span></span>(<span>what=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>hides <em>all</em> output, regardless of <code>what</code> type of output is to be hidden.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@contextlib.contextmanager
+def hide(what=None):
+    &#34;hides *all* output, regardless of `what` type of output is to be hidden.&#34;
+    with state.settings(quiet=True):
+        yield</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.lcd"><code class="name flex">
+<span>def <span class="ident">lcd</span></span>(<span>local_dir)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>temporarily changes the local working directory</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@contextlib.contextmanager
+def lcd(local_dir):
+    &#34;temporarily changes the local working directory&#34;
+    assert os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir
+    with state.settings():
+        current_dir = cwd()
+        state.add_cleanup(lambda: os.chdir(current_dir))
+        os.chdir(local_dir)
+        yield</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.local"><code class="name flex">
+<span>def <span class="ident">local</span></span>(<span>command, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>preprocesses given <code>command</code> and options before executing it locally using Python's <code>subprocess.Popen</code></p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def local(command, **kwargs):
+    &#34;preprocesses given `command` and options before executing it locally using Python&#39;s `subprocess.Popen`&#34;
+    base_kwargs = {
+        &#34;use_shell&#34;: True,
+        &#34;combine_stderr&#34;: True,
+        &#34;capture&#34;: False,
+        &#34;timeout&#34;: None,
+        &#34;quiet&#34;: False,
+        &#34;warn_only&#34;: False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        &#34;abort_exception&#34;: RuntimeError,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # TODO: once py2 support has been dropped, move this back to file head
+    devnull_opened = False
+    try:
+        from subprocess import DEVNULL  # py3
+    except ImportError:
+        devnull_opened = True
+        DEVNULL = open(os.devnull, &#34;wb&#34;)
+
+    if final_kwargs[&#34;capture&#34;]:
+        if final_kwargs[&#34;combine_stderr&#34;]:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.STDOUT
+        else:
+            out_stream = subprocess.PIPE
+            err_stream = subprocess.PIPE
+    else:
+        if final_kwargs[&#34;quiet&#34;]:
+            # we&#39;re not capturing and we&#39;ve been told to be quiet
+            # send everything to /dev/null
+            out_stream = DEVNULL
+            err_stream = DEVNULL
+        else:
+            out_stream = None
+            err_stream = None
+
+    if not final_kwargs[&#34;use_shell&#34;] and not isinstance(command, list):
+        raise ValueError(&#34;when shell=False, given command *must* be a list&#34;)
+
+    if final_kwargs[&#34;use_shell&#34;]:
+        command = shell_wrap_command(command)
+
+    proc = subprocess.Popen(
+        command, shell=final_kwargs[&#34;use_shell&#34;], stdout=out_stream, stderr=err_stream
+    )
+    if final_kwargs[&#34;timeout&#34;]:
+        timer = Timer(final_kwargs[&#34;timeout&#34;], proc.kill)
+        try:
+            timer.start()  # proximity matters
+            stdout, stderr = proc.communicate()
+        finally:
+            timer.cancel()
+    else:
+        stdout, stderr = proc.communicate()
+
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1240-L1244
+    result = {
+        &#34;return_code&#34;: proc.returncode,
+        &#34;failed&#34;: proc.returncode != 0,
+        &#34;succeeded&#34;: proc.returncode == 0,
+        &#34;command&#34;: command,
+        &#34;stdout&#34;: (stdout or b&#34;&#34;).decode(&#34;utf-8&#34;).splitlines(),
+        &#34;stderr&#34;: (stderr or b&#34;&#34;).decode(&#34;utf-8&#34;).splitlines(),
+    }
+
+    if devnull_opened:
+        DEVNULL.close()
+
+    if result[&#34;succeeded&#34;]:
+        return result
+
+    err_msg = &#34;local() encountered an error (return code %s) while executing %r&#34; % (
+        result[&#34;return_code&#34;],
+        command,
+    )
+
+    if final_kwargs[&#34;warn_only&#34;]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, &#34;result&#34;, result)
+
+    raise exc</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.pem_key"><code class="name flex">
+<span>def <span class="ident">pem_key</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>returns the first private key found in a list of common private keys.
+if none of the keys exist, the default (first) key will be returned.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def pem_key():
+    &#34;&#34;&#34;returns the first private key found in a list of common private keys.
+    if none of the keys exist, the default (first) key will be returned.&#34;&#34;&#34;
+    id_list = [&#34;id_rsa&#34;, &#34;id_dsa&#34;, &#34;identity&#34;, &#34;id_ecdsa&#34;]
+    id_list = [os.path.expanduser(&#34;~/.ssh/&#34; + idstr) for idstr in id_list]
+    for id_path in id_list:
+        if os.path.isfile(id_path):
+            return id_path
+        LOG.debug(&#34;key not found: %s&#34; % id_path)
+
+    default = id_list[0]
+    return default</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.prompt"><code class="name flex">
+<span>def <span class="ident">prompt</span></span>(<span>msg)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>issues a prompt for input.
+raises a <code>PromptedException</code> if <code>abort_on_prompts</code> in <code>state.ENV</code> is <code>True</code> or executing within
+another process using <code>execute.parallel</code> where input can't be supplied.
+if <code>abort_exception</code> is set in <code>state.ENV</code>, then that exception is raised instead</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def prompt(msg):
+    &#34;&#34;&#34;issues a prompt for input.
+    raises a `PromptedException` if `abort_on_prompts` in `state.ENV` is `True` or executing within
+    another process using `execute.parallel` where input can&#39;t be supplied.
+    if `abort_exception` is set in `state.ENV`, then that exception is raised instead&#34;&#34;&#34;
+    if state.ENV.get(&#34;abort_on_prompts&#34;, False):
+        abort_ex = state.ENV.get(&#34;abort_exception&#34;, PromptedException)
+        raise abort_ex(&#34;prompted with: %s&#34; % (msg,))
+    print(msg)
+    try:
+        return raw_input(&#34;&gt; &#34;)
+    except NameError:
+        return input(&#34;&gt; &#34;)</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.rcd"><code class="name flex">
+<span>def <span class="ident">rcd</span></span>(<span>remote_working_dir)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>ensures all commands run are done from the given remote directory. if remote directory doesn't exist, command will not be run</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@contextlib.contextmanager
+def rcd(remote_working_dir):
+    &#34;ensures all commands run are done from the given remote directory. if remote directory doesn&#39;t exist, command will not be run&#34;
+    with state.settings(remote_working_dir=remote_working_dir):
+        yield</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.remote"><code class="name flex">
+<span>def <span class="ident">remote</span></span>(<span>command, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>preprocesses given <code>command</code> and options before sending it to <code>_execute</code> to be executed on remote host</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remote(command, **kwargs):
+    &#34;preprocesses given `command` and options before sending it to `_execute` to be executed on remote host&#34;
+
+    # Fabric function signature for `run`
+    # shell=True # done
+    # pty=True   # mutually exclusive with `combine_stderr` in pssh. not sure how Fabric/Paramiko is doing it
+    # combine_stderr=None # mutually exclusive with use_pty. &#39;True&#39; in global env.
+    # quiet=False, # done
+    # warn_only=False # done
+    # stdout=None # done, stdout/stderr always available unless explicitly discarded. &#39;see discard_output&#39;
+    # stderr=None # done, stderr not available when combine_stderr is `True`
+    # timeout=None # done
+    # shell_escape=None # ignored. shell commands are always escaped
+    # capture_buffer_size=None # correlates to `ssh2.channel.read` and the `size` parameter. Ignored.
+
+    # parameters we&#39;re interested in and their default values
+    base_kwargs = {
+        # current user. sensible default but probably not what you want
+        &#34;user&#34;: getpass.getuser(),
+        &#34;host_string&#34;: None,
+        &#34;key_filename&#34;: os.path.expanduser(&#34;~/.ssh/id_rsa&#34;),
+        &#34;port&#34;: 22,
+        &#34;use_shell&#34;: True,
+        &#34;use_sudo&#34;: False,
+        &#34;combine_stderr&#34;: True,
+        &#34;quiet&#34;: False,
+        &#34;discard_output&#34;: False,
+        &#34;remote_working_dir&#34;: None,
+        &#34;timeout&#34;: None,
+        &#34;warn_only&#34;: False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
+        &#34;abort_exception&#34;: RuntimeError,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # wrap the command up
+    # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L920-L925
+    if final_kwargs[&#34;remote_working_dir&#34;]:
+        command = cwd_wrap_command(command, final_kwargs[&#34;remote_working_dir&#34;])
+    if final_kwargs[&#34;use_shell&#34;]:
+        command = shell_wrap_command(command)
+    if final_kwargs[&#34;use_sudo&#34;]:
+        command = sudo_wrap_command(command)
+
+    # if use_pty is True, stdout and stderr are combined and stderr will yield nothing.
+    # - https://parallel-ssh.readthedocs.io/en/latest/advanced.html#combined-stdout-stderr
+    use_pty = final_kwargs[&#34;combine_stderr&#34;]
+
+    # values `remote` specifically passes to `_execute`
+    execute_kwargs = {&#34;command&#34;: command, &#34;use_pty&#34;: use_pty}
+    execute_kwargs = merge(final_kwargs, execute_kwargs)
+    execute_kwargs = subdict(
+        execute_kwargs,
+        [
+            &#34;command&#34;,
+            &#34;user&#34;,
+            &#34;key_filename&#34;,
+            &#34;host_string&#34;,
+            &#34;port&#34;,
+            &#34;use_pty&#34;,
+            &#34;timeout&#34;,
+        ],
+    )
+
+    # TODO: validate `_execute`s args. `host_string` can&#39;t be None for example
+
+    # run command
+    result = _execute(**execute_kwargs)
+
+    # handle stdout/stderr streams
+    output_kwargs = subdict(final_kwargs, [&#34;quiet&#34;, &#34;discard_output&#34;])
+    stdout = _process_output(sys.stdout, result[&#34;stdout&#34;], **output_kwargs)
+    stderr = _process_output(sys.stderr, result[&#34;stderr&#34;], **output_kwargs)
+
+    # command must have finished before we have access to return code
+    return_code = result[&#34;return_code&#34;]()
+    result.update(
+        {
+            &#34;stdout&#34;: stdout,
+            &#34;stderr&#34;: stderr,
+            &#34;return_code&#34;: return_code,
+            &#34;failed&#34;: return_code &gt; 0,
+            &#34;succeeded&#34;: return_code == 0,
+        }
+    )
+
+    if result[&#34;succeeded&#34;]:
+        return result
+
+    err_msg = &#34;remote() encountered an error (return code %s) while executing %r&#34; % (
+        result[&#34;return_code&#34;],
+        command,
+    )
+
+    if final_kwargs[&#34;warn_only&#34;]:
+        LOG.warning(err_msg)
+        return result
+
+    abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
+    exc = abort_exc_klass(err_msg)
+    setattr(exc, &#34;result&#34;, result)
+
+    raise exc</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.remote_file_exists"><code class="name flex">
+<span>def <span class="ident">remote_file_exists</span></span>(<span>path, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>returns True if given path exists on remote system</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remote_file_exists(path, **kwargs):
+    &#34;returns True if given path exists on remote system&#34;
+    # note: Fabric is doing something weird and clever here:
+    # - https://github.com/mathiasertl/fabric/blob/master/fabric/contrib/files.py#L474-L485
+    # but their examples don&#39;t work:
+
+    # $ /bin/sh
+    # sh-5.0$ foo=&#34;$(echo /usr/\*/share)&#34;
+    # sh-5.0$ echo $foo
+    # /usr/*/share
+    # sh-5.0$ exit
+    # $ echo $SHELL
+    # $ /bin/bash
+    # $ foo=&#34;$(echo /usr/\*/share)&#34;
+    # $ echo $foo
+    # /usr/*/share
+
+    # TODO: revisit
+    # update 2020/01: it does work, I just had no &#34;/usr/[anything]/share&#34; directories.
+    # this works for me:
+    #   foo=$(echo /\*/share/)
+    #   echo $foo
+    #   /usr/share/
+
+    base_kwargs = {
+        &#34;use_sudo&#34;: False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    # do not raise an exception if remote file doesn&#39;t exist
+    final_kwargs[&#34;warn_only&#34;] = True
+
+    remote_fn = remote_sudo if final_kwargs[&#34;use_sudo&#34;] else remote
+    command = &#34;test -e %s&#34; % path
+    return remote_fn(command, **final_kwargs)[&#34;return_code&#34;] == 0</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.remote_sudo"><code class="name flex">
+<span>def <span class="ident">remote_sudo</span></span>(<span>command, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>exactly the same as <a title="threadbare.operations.remote" href="#threadbare.operations.remote"><code>remote()</code></a>, but the given command is run as the root user</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remote_sudo(command, **kwargs):
+    &#34;exactly the same as `remote`, but the given command is run as the root user&#34;
+    # user=None  # ignore
+    # group=None # ignore
+    kwargs[&#34;use_sudo&#34;] = True
+    return remote(command, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.single_command"><code class="name flex">
+<span>def <span class="ident">single_command</span></span>(<span>cmd_list)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>given a list of commands to run, returns a single command.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def single_command(cmd_list):
+    &#34;given a list of commands to run, returns a single command.&#34;
+    # `remote` and `local` will do any escaping as necessary
+    if cmd_list in [None, []]:
+        return None
+    return &#34; &amp;&amp; &#34;.join(map(str, cmd_list))</code></pre>
+</details>
+</dd>
+<dt id="threadbare.operations.upload"><code class="name flex">
+<span>def <span class="ident">upload</span></span>(<span>local_path, remote_path, use_sudo=False, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>uploads file at <code>local_path</code> to the given <code>remote_path</code>, overwriting anything that may be at that path</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def upload(local_path, remote_path, use_sudo=False, **kwargs):
+    &#34;uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path&#34;
+    with state.settings(quiet=True):
+
+        # bytes handling
+        local_path, cleanup_fn = _write_bytes_to_temporary_file(local_path)
+        if cleanup_fn:
+            state.add_cleanup(cleanup_fn)
+
+        if os.path.isdir(local_path):
+            raise ValueError(&#34;folders cannot be uploaded&#34;)
+
+        if use_sudo:
+            return _upload_as_root_hack(local_path, remote_path, **kwargs)
+
+        if not os.path.exists(local_path):
+            raise EnvironmentError(&#34;local file does not exist: %s&#34; % (local_path,))
+
+        # you&#39;re not crazy, sftp is *exceptionally* slow:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        # local(&#39;du -sh %s&#39; % local_path)
+        # client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
+        client = _ssh_client(**kwargs)
+        # print(&#39;client&#39;,client)
+        client.copy_file(local_path, remote_path)</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="threadbare.operations.NetworkError"><code class="flex name class">
+<span>class <span class="ident">NetworkError</span></span>
+<span>(</span><span>wrapped_exception_inst)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>generic 'died while doing something ssh-related' catch-all exception class.
+calling str() on this exception will return the results of calling str() on the
+wrapped exception.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NetworkError(BaseException):
+    &#34;&#34;&#34;generic &#39;died while doing something ssh-related&#39; catch-all exception class.
+    calling str() on this exception will return the results of calling str() on the
+    wrapped exception.&#34;&#34;&#34;
+
+    def __init__(self, wrapped_exception_inst):
+        self.wrapped = wrapped_exception_inst
+
+    def __str__(self):
+        # we have the opportunity here to tweak the error messages to make them
+        # similar to their equivalents in Fabric.
+        # original error messages are still available via `str(excinst.wrapped)`
+        space = &#34; &#34;
+        custom_error_prefixes = {
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
+            pssh_exceptions.Timeout: &#34;Timed out trying to connect.&#34;,
+            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
+            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
+            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
+            pssh_exceptions.SSHException: &#34;Low level socket error connecting to host.&#34;,
+            pssh_exceptions.SessionError: &#34;Low level socket error connecting to host.&#34;,
+            pssh_exceptions.ConnectionErrorException: &#34;Low level socket error connecting to host.&#34;,
+        }
+        new_error = custom_error_prefixes.get(type(self.wrapped)) or &#34;&#34;
+        original_error = str(self.wrapped)
+        return new_error + space + original_error</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="threadbare.operations.SSHClient"><code class="flex name class">
+<span>class <span class="ident">SSHClient</span></span>
+<span>(</span><span>host, user=None, password=None, port=None, pkey=None, num_retries=3, retry_delay=5, allow_agent=True, timeout=None, forward_ssh_agent=False, proxy_host=None, keepalive_seconds=60)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>ssh2-python (libssh2) based non-blocking SSH client.</p>
+<p>:param host: Host name or IP to connect to.
+:type host: str
+:param user: User to connect as. Defaults to logged in user.
+:type user: str
+:param password: Password to use for password authentication.
+:type password: str
+:param port: SSH port to connect to. Defaults to SSH default (22)
+:type port: int
+:param pkey: Private key file path to use for authentication. Path must
+be either absolute path or relative to user home directory
+like <code>~/&lt;path&gt;</code>.
+:type pkey: str
+:param num_retries: (Optional) Number of connection and authentication
+attempts before the client gives up. Defaults to 3.
+:type num_retries: int
+:param retry_delay: Number of seconds to wait between retries. Defaults
+to :py:class:<code>pssh.constants.RETRY_DELAY</code>
+:type retry_delay: int
+:param timeout: SSH session timeout setting in seconds. This controls
+timeout setting of authenticated SSH sessions.
+:type timeout: int
+:param allow_agent: (Optional) set to False to disable connecting to
+the system's SSH agent
+:type allow_agent: bool
+:param forward_ssh_agent: (Optional) Turn on SSH agent forwarding -
+equivalent to <code>ssh -A</code> from the <code>ssh</code> command line utility.
+Defaults to True if not set.
+:type forward_ssh_agent: bool
+:param proxy_host: Connection to host is via provided proxy host
+and client should use self.proxy_host for connection attempts.
+:type proxy_host: str
+:param keepalive_seconds: Interval of keep alive messages being sent to
+server. Set to <code>0</code> or <code>False</code> to disable.</p>
+<p>:raises: :py:class:<code>pssh.exceptions.PKeyFileError</code> on errors finding
+provided private key.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SSHClient(PSSHClient):
+    def __deepcopy__(self, memo):
+        # do not copy.deepcopy ourselves or the pssh SSHClient object, just
+        # return a reference to the object (self)
+        # - https://docs.python.org/3/library/copy.html
+        return self</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>pssh.clients.native.single.SSHClient</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="threadbare" href="index.html">threadbare</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="two-column">
+<li><code><a title="threadbare.operations.download" href="#threadbare.operations.download">download</a></code></li>
+<li><code><a title="threadbare.operations.handle" href="#threadbare.operations.handle">handle</a></code></li>
+<li><code><a title="threadbare.operations.hide" href="#threadbare.operations.hide">hide</a></code></li>
+<li><code><a title="threadbare.operations.lcd" href="#threadbare.operations.lcd">lcd</a></code></li>
+<li><code><a title="threadbare.operations.local" href="#threadbare.operations.local">local</a></code></li>
+<li><code><a title="threadbare.operations.pem_key" href="#threadbare.operations.pem_key">pem_key</a></code></li>
+<li><code><a title="threadbare.operations.prompt" href="#threadbare.operations.prompt">prompt</a></code></li>
+<li><code><a title="threadbare.operations.rcd" href="#threadbare.operations.rcd">rcd</a></code></li>
+<li><code><a title="threadbare.operations.remote" href="#threadbare.operations.remote">remote</a></code></li>
+<li><code><a title="threadbare.operations.remote_file_exists" href="#threadbare.operations.remote_file_exists">remote_file_exists</a></code></li>
+<li><code><a title="threadbare.operations.remote_sudo" href="#threadbare.operations.remote_sudo">remote_sudo</a></code></li>
+<li><code><a title="threadbare.operations.single_command" href="#threadbare.operations.single_command">single_command</a></code></li>
+<li><code><a title="threadbare.operations.upload" href="#threadbare.operations.upload">upload</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="threadbare.operations.NetworkError" href="#threadbare.operations.NetworkError">NetworkError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="threadbare.operations.SSHClient" href="#threadbare.operations.SSHClient">SSHClient</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
