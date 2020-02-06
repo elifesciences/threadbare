@@ -508,7 +508,7 @@ def test_prompt_operation_aborted_custom_exception():
 def test_formatted_output():
     "`_print_line`, called by `remote`, can have it's output string customised and still return the original string for processing"
     expected_stdout = "hello, world!"
-    expected_buffer = "[35.153.232.132] stdout: hello, world!"
+    expected_buffer = "[35.153.232.132] out: hello, world!"
 
     line_template = "[{host}] {pipe}: {line}"
     strbuffer = StringIO()

@@ -217,7 +217,7 @@ def _print_line(output_pipe, line, **kwargs):
 
     if not final_kwargs["quiet"]:
         # useful values that can be part of the template
-        pipe_type = "stderr" if output_pipe == sys.stderr else "stdout"
+        pipe_type = "err" if output_pipe == sys.stderr else "out"
         dt = datetime.now()
         template_kwargs = {
             "line": line,
