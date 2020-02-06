@@ -216,6 +216,7 @@ def execute_with_hosts(func, hosts=None):
     # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
     # it says 'for informational purposes only' and nothing we use depends on it, so I'm disabling for now
     # env['all_hosts'] = env['hosts']
-    results = execute(func, param_key="host_string", param_values=host_list)
+    with state.settings(line_template="[{host}] {line}\n"):
+        results = execute(func, param_key="host_string", param_values=host_list)
     # results are ordered so we can do this
     return dict(zip(host_list, results))  # {'192.168.0.1': [], '192.169.0.3': []}
