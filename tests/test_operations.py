@@ -1,12 +1,14 @@
-import pytest
-
 try:
+    # py3
     import unittest.mock as mock
     from unittest.mock import patch
+    from io import StringIO
 except ImportError:
     import mock
     from mock import patch
+    from StringIO import StringIO
 
+import pytest
 from threadbare import operations, state
 from threadbare.common import merge, cwd, PromptedException
 from pssh import exceptions as pssh_exceptions
@@ -501,3 +503,16 @@ def test_prompt_operation_aborted_custom_exception():
     with state.settings(abort_on_prompts=True, abort_exception=ValueError):
         with pytest.raises(ValueError):
             operations.prompt("some message")
+
+
+def test_formatted_output():
+    "`_print_line`, called by `remote`, can have it's output string customised and still return the original string for processing"
+    expected_stdout = "hello, world!"
+    expected_buffer = "[35.153.232.132] stdout: hello, world!"
+
+    line_template = "[{host}] {pipe}: {line}"
+    strbuffer = StringIO()
+    with state.settings(host_string="35.153.232.132", line_template=line_template):
+        result = operations._print_line(strbuffer, "hello, world!")
+        assert expected_stdout == result
+        assert expected_buffer == strbuffer.getvalue()
