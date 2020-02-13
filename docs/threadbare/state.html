@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.7.4" />
+<title>threadbare.state API documentation</title>
+<meta name="description" content="" />
+<link href='/docs/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='/docs/resources/third-party/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{font-weight:bold}#index h4 + ul{margin-bottom:.6em}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>threadbare.state</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import copy
+import contextlib
+
+CLEANUP_KEY = &#34;_cleanup&#34;
+
+
+class FreezeableDict(dict):
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.read_only = False
+
+    def update(self, new_dict):
+        if self.read_only:
+            raise ValueError(
+                &#34;dictionary is locked attempting to `update` with %r&#34; % new_dict
+            )
+        dict.update(self, new_dict)
+
+    def __setitem__(self, key, val):
+        # I suspect multiprocessing isn&#39;t copying the custom &#39;read_only&#39; attribute back
+        # from the child process results. be aware of this weirdness
+        # print(&#34;self:&#34;, self.__dict__, &#34;internal data:&#34;, self)
+        if hasattr(self, &#34;read_only&#34;) and self.read_only:
+            raise ValueError(
+                &#34;dictionary is locked attempting to `__setitem__` %r with %r&#34;
+                % (key, val)
+            )
+        dict.__setitem__(self, key, val)
+
+
+def read_only(d):
+    if hasattr(d, &#34;read_only&#34;):
+        d.read_only = True
+
+
+def read_write(d):
+    if hasattr(d, &#34;read_only&#34;):
+        d.read_only = False
+
+
+def initial_state():
+    &#34;&#34;&#34;returns a new, empty, locked, FreezeableDict instance that is used as the initial `state.ENV` value.
+
+    if you are thinking &#34;it would be really convenient if &#39;some_setting&#39; was &#39;some_value&#39; by default&#34;,
+    see `set_defaults`.&#34;&#34;&#34;
+    new_env = FreezeableDict()
+    read_only(new_env)
+    return new_env
+
+
+ENV = initial_state()
+
+DEPTH = 0  # used to determine how deeply nested we are
+
+
+def set_defaults(defaults_dict=None):
+    &#34;&#34;&#34;re-initialises the `state.ENV` dictionary with the given defaults.
+    with no arguments, the global state will be reverted to it&#39;s initial state (an empty FreezeableDict).
+
+    use `state.set_defaults` BEFORE using ANY other `state.*` functions are called.&#34;&#34;&#34;
+    global ENV, DEPTH
+    if DEPTH != 0:
+        msg = &#34;refusing to set initial `threadbare.state.ENV` state within a `threadbare.state.settings` context manager.&#34;
+        raise EnvironmentError(msg)
+
+    new_env = FreezeableDict()
+    new_env.update(defaults_dict or {})
+    read_only(new_env)
+    ENV = new_env
+
+
+def cleanup(old_state):
+    if CLEANUP_KEY in old_state:
+        for cleanup_fn in old_state[CLEANUP_KEY]:
+            cleanup_fn()
+        del old_state[CLEANUP_KEY]
+
+
+def _add_cleanup(state, fn):
+    cleanup_fn_list = state.get(CLEANUP_KEY, [])
+    cleanup_fn_list.append(fn)
+    state[CLEANUP_KEY] = cleanup_fn_list
+
+
+def add_cleanup(fn):
+    &#34;add a function to a list of functions that are called after leaving the current scope of the context manager&#34;
+    return _add_cleanup(ENV, fn)
+
+
+@contextlib.contextmanager
+def settings(**kwargs):
+    global DEPTH
+
+    state = ENV
+    if not isinstance(state, dict):
+        raise TypeError(
+            &#34;state map must be a dictionary-like object, not %r&#34; % type(state)
+        )
+
+    # deepcopy will attempt to pickle and unpickle all objects in state
+    # we can&#39;t guarantee what will live in state and if it&#39;s possible to pickle it or not
+    # the SSHClient is one such unserialisable object that has had to be subclassed
+    # another approach would be to relax guarantees that the environment is completely reverted
+
+    # call `read_write` here as `deepcopy` copies across attributes (like `read_only`) and
+    # then values using `__setitem__`, causing errors in FreezeableDict when &#39;set_defaults&#39; used
+    read_write(state)
+
+    original_values = copy.deepcopy(state)
+    DEPTH += 1
+
+    state.update(kwargs)
+
+    # ensure child context processors don&#39;t clean up their parents
+    if CLEANUP_KEY in state:
+        state.update({CLEANUP_KEY: []})
+
+    try:
+        yield state
+    finally:
+        cleanup(state)
+        state.clear()
+        state.update(original_values)
+
+        DEPTH -= 1
+
+        if DEPTH == 0:
+            # we&#39;re leaving the top-most context decorator
+            # ensure state dictionary is marked as read-only
+            read_only(state)</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="threadbare.state.add_cleanup"><code class="name flex">
+<span>def <span class="ident">add_cleanup</span></span>(<span>fn)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>add a function to a list of functions that are called after leaving the current scope of the context manager</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_cleanup(fn):
+    &#34;add a function to a list of functions that are called after leaving the current scope of the context manager&#34;
+    return _add_cleanup(ENV, fn)</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.cleanup"><code class="name flex">
+<span>def <span class="ident">cleanup</span></span>(<span>old_state)</span>
+</code></dt>
+<dd>
+<section class="desc"></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cleanup(old_state):
+    if CLEANUP_KEY in old_state:
+        for cleanup_fn in old_state[CLEANUP_KEY]:
+            cleanup_fn()
+        del old_state[CLEANUP_KEY]</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.initial_state"><code class="name flex">
+<span>def <span class="ident">initial_state</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>returns a new, empty, locked, FreezeableDict instance that is used as the initial <code>state.ENV</code> value.</p>
+<p>if you are thinking "it would be really convenient if 'some_setting' was 'some_value' by default",
+see <a title="threadbare.state.set_defaults" href="#threadbare.state.set_defaults"><code>set_defaults()</code></a>.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initial_state():
+    &#34;&#34;&#34;returns a new, empty, locked, FreezeableDict instance that is used as the initial `state.ENV` value.
+
+    if you are thinking &#34;it would be really convenient if &#39;some_setting&#39; was &#39;some_value&#39; by default&#34;,
+    see `set_defaults`.&#34;&#34;&#34;
+    new_env = FreezeableDict()
+    read_only(new_env)
+    return new_env</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.read_only"><code class="name flex">
+<span>def <span class="ident">read_only</span></span>(<span>d)</span>
+</code></dt>
+<dd>
+<section class="desc"></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def read_only(d):
+    if hasattr(d, &#34;read_only&#34;):
+        d.read_only = True</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.read_write"><code class="name flex">
+<span>def <span class="ident">read_write</span></span>(<span>d)</span>
+</code></dt>
+<dd>
+<section class="desc"></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def read_write(d):
+    if hasattr(d, &#34;read_only&#34;):
+        d.read_only = False</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.set_defaults"><code class="name flex">
+<span>def <span class="ident">set_defaults</span></span>(<span>defaults_dict=None)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>re-initialises the <code>state.ENV</code> dictionary with the given defaults.
+with no arguments, the global state will be reverted to it's initial state (an empty FreezeableDict).</p>
+<p>use <code>state.set_defaults</code> BEFORE using ANY other <code>state.*</code> functions are called.</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_defaults(defaults_dict=None):
+    &#34;&#34;&#34;re-initialises the `state.ENV` dictionary with the given defaults.
+    with no arguments, the global state will be reverted to it&#39;s initial state (an empty FreezeableDict).
+
+    use `state.set_defaults` BEFORE using ANY other `state.*` functions are called.&#34;&#34;&#34;
+    global ENV, DEPTH
+    if DEPTH != 0:
+        msg = &#34;refusing to set initial `threadbare.state.ENV` state within a `threadbare.state.settings` context manager.&#34;
+        raise EnvironmentError(msg)
+
+    new_env = FreezeableDict()
+    new_env.update(defaults_dict or {})
+    read_only(new_env)
+    ENV = new_env</code></pre>
+</details>
+</dd>
+<dt id="threadbare.state.settings"><code class="name flex">
+<span>def <span class="ident">settings</span></span>(<span>**kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@contextlib.contextmanager
+def settings(**kwargs):
+    global DEPTH
+
+    state = ENV
+    if not isinstance(state, dict):
+        raise TypeError(
+            &#34;state map must be a dictionary-like object, not %r&#34; % type(state)
+        )
+
+    # deepcopy will attempt to pickle and unpickle all objects in state
+    # we can&#39;t guarantee what will live in state and if it&#39;s possible to pickle it or not
+    # the SSHClient is one such unserialisable object that has had to be subclassed
+    # another approach would be to relax guarantees that the environment is completely reverted
+
+    # call `read_write` here as `deepcopy` copies across attributes (like `read_only`) and
+    # then values using `__setitem__`, causing errors in FreezeableDict when &#39;set_defaults&#39; used
+    read_write(state)
+
+    original_values = copy.deepcopy(state)
+    DEPTH += 1
+
+    state.update(kwargs)
+
+    # ensure child context processors don&#39;t clean up their parents
+    if CLEANUP_KEY in state:
+        state.update({CLEANUP_KEY: []})
+
+    try:
+        yield state
+    finally:
+        cleanup(state)
+        state.clear()
+        state.update(original_values)
+
+        DEPTH -= 1
+
+        if DEPTH == 0:
+            # we&#39;re leaving the top-most context decorator
+            # ensure state dictionary is marked as read-only
+            read_only(state)</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="threadbare.state.FreezeableDict"><code class="flex name class">
+<span>class <span class="ident">FreezeableDict</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>dict() -&gt; new empty dictionary
+dict(mapping) -&gt; new dictionary initialized from a mapping object's
+(key, value) pairs
+dict(iterable) -&gt; new dictionary initialized as if via:
+d = {}
+for k, v in iterable:
+d[k] = v
+dict(**kwargs) -&gt; new dictionary initialized with the name=value pairs
+in the keyword argument list.
+For example:
+dict(one=1, two=2)</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class FreezeableDict(dict):
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.read_only = False
+
+    def update(self, new_dict):
+        if self.read_only:
+            raise ValueError(
+                &#34;dictionary is locked attempting to `update` with %r&#34; % new_dict
+            )
+        dict.update(self, new_dict)
+
+    def __setitem__(self, key, val):
+        # I suspect multiprocessing isn&#39;t copying the custom &#39;read_only&#39; attribute back
+        # from the child process results. be aware of this weirdness
+        # print(&#34;self:&#34;, self.__dict__, &#34;internal data:&#34;, self)
+        if hasattr(self, &#34;read_only&#34;) and self.read_only:
+            raise ValueError(
+                &#34;dictionary is locked attempting to `__setitem__` %r with %r&#34;
+                % (key, val)
+            )
+        dict.__setitem__(self, key, val)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.dict</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="threadbare.state.FreezeableDict.update"><code class="name flex">
+<span>def <span class="ident">update</span></span>(<span>self, new_dict)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>D.update([E, ]**F) -&gt; None.
+Update D from dict/iterable E and F.
+If E is present and has a .keys() method, then does:
+for k in E: D[k] = E[k]
+If E is present and lacks a .keys() method, then does:
+for k, v in E: D[k] = v
+In either case, this is followed by: for k in F:
+D[k] = F[k]</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update(self, new_dict):
+    if self.read_only:
+        raise ValueError(
+            &#34;dictionary is locked attempting to `update` with %r&#34; % new_dict
+        )
+    dict.update(self, new_dict)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="threadbare" href="index.html">threadbare</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="two-column">
+<li><code><a title="threadbare.state.add_cleanup" href="#threadbare.state.add_cleanup">add_cleanup</a></code></li>
+<li><code><a title="threadbare.state.cleanup" href="#threadbare.state.cleanup">cleanup</a></code></li>
+<li><code><a title="threadbare.state.initial_state" href="#threadbare.state.initial_state">initial_state</a></code></li>
+<li><code><a title="threadbare.state.read_only" href="#threadbare.state.read_only">read_only</a></code></li>
+<li><code><a title="threadbare.state.read_write" href="#threadbare.state.read_write">read_write</a></code></li>
+<li><code><a title="threadbare.state.set_defaults" href="#threadbare.state.set_defaults">set_defaults</a></code></li>
+<li><code><a title="threadbare.state.settings" href="#threadbare.state.settings">settings</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="threadbare.state.FreezeableDict" href="#threadbare.state.FreezeableDict">FreezeableDict</a></code></h4>
+<ul class="">
+<li><code><a title="threadbare.state.FreezeableDict.update" href="#threadbare.state.FreezeableDict.update">update</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+</footer>
+<script src="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
