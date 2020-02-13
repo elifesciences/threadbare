@@ -1,4 +1,5 @@
 parallel-ssh
+pdoc3
 pytest
 pytest-cov
 pyflakes

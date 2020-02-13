@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.7.4" />
+<title>threadbare API documentation</title>
+<meta name="description" content="Threadbare …" />
+<link href='/docs/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='/docs/resources/third-party/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{font-weight:bold}#index h4 + ul{margin-bottom:.6em}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>threadbare</code></h1>
+</header>
+<section id="section-intro">
+<h1 id="threadbare">Threadbare</h1>
+<p>A partial replacement for the slice of Fabric 1.x and Paramiko used in <a href="https://github.com/elifesciences/builder">Builder</a></p>
+<h2 id="usage">usage</h2>
+<p>Threadbare can be used like this:</p>
+<pre><code class="python">import threadbare
+threadbare.operations.remote(&quot;echo 'hello world!'&quot;, host_string='my.server', warn_only=True)
+</code></pre>
+<p>or like this:</p>
+<pre><code class="python">from threadbare.state import settings
+from threadbare.operations import remote
+with settings(host_string='my.server', warn_only=True):
+    remote(&quot;echo 'hello world!'&quot;)
+</code></pre>
+<h2 id="local-tests">local tests</h2>
+<p>Run the <a href="./test.sh">test suite</a> with <code>./test.sh</code></p>
+<p>Individual tests can be run with <code>./test.sh -k test_fn_name</code></p>
+<h2 id="remote-tests">remote tests</h2>
+<p>A set of tests that also serve as working examples of threadbare's functionality can be executed by starting a dummy SSH
+server:</p>
+<pre><code>./tests-remote/sshd-server.sh
+</code></pre>
+<p>And then, in another terminal, run <a href="./example.py">example.py</a> with:</p>
+<pre><code>./test-examples.sh
+</code></pre>
+<p>While the examples are harmless they do involve uploading and downloading files to <code>/tmp</code>, testing permissions and
+invoking <code>sudo</code>. Individual tests can be run with <code>./test-examples.sh -k test_fn_name</code>.</p>
+<p>The dummy ssh server creates the temporary directory <code>/tmp/sshd-dummy</code> and writes the host and user certificates there.</p>
+<p>The only user that may connect to this dummy SSH server is the current user using the certificate generated for them.</p>
+<p>See <code>./tests-remote/ssh-client.sh</code> for a working example on connecting to the dummy SSH server.</p>
+<h2 id="localremote-tests">local+remote tests</h2>
+<p>This runs a dummy ssh server and runs both the local unit tests as well as the remote
+tests. It's used in CI and generates a set of temporary credentials with deliberately
+insecure ssh configuration. Be cautious.</p>
+<pre><code>./project_tests.sh
+</code></pre>
+<h1 id="a-guide-to-threadbare-for-developers">a guide to Threadbare for developers</h1>
+<p>Threadbare is comprised of just three modules:</p>
+<ol>
+<li><a title="threadbare.state" href="state.html"><code>threadbare.state</code></a></li>
+<li><a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a></li>
+<li><a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a></li>
+</ol>
+<h2 id="state">state</h2>
+<p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/state.py">source</a>)</p>
+<p>Underpinning all of Fabric is it's manipulation of a global state dictionary called the 'environment'.</p>
+<p>For the most part this manipulation is sane, <em>single threaded</em> and predictable.</p>
+<p>It has many defaults and functions will dip into the environment dictionary and pull out settings as they need them.</p>
+<p>Global state can be built up by nesting context managers like <code>settings</code> or <code>hide</code> or <code>lcd</code>, pushing new state into the
+environment dictionary, and then popping it off as execution leaves the context manager.</p>
+<p>The <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module replicates this mechanism but with no initial defaults. Default values are pushed back into the
+functions and may be overridden globally in a general way or overridden specifically by passing in a keyword argument to
+the function.</p>
+<p>This change:</p>
+<ul>
+<li>improves locality of reference. All options that a function operates on are defined right there with the function.</li>
+<li>keeps the <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module small and dumb and predictable</li>
+</ul>
+<h2 id="operations">operations</h2>
+<p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/operations.py">source</a>)</p>
+<p>Fabric provides a set of very useful commands, like <code>local</code> or <code>sudo</code> or <code>cd</code>.</p>
+<p>The <a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a> module re-implements these commands and they make heavy use of the <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module.</p>
+<p>Not all commands have been re-implemented, just those in use by Builder.</p>
+<p>A big part of the <a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a> module is running commands on a remote host. Where Fabric uses it's sister project
+Paramiko, Threadbare uses a library called PSSH, or ParallelSSH. ParallelSSH itself wraps another project of theirs
+called <code>ssh-python</code>, an interface between <code>libssh</code> and Python. ParallelSSH does a little more than just wrap
+<code>ssh-python</code>, it also provides a higher level (and more convenient) interface to basic network operations and ensures
+thread safety.</p>
+<p>Threadbare does <em>not</em> use the parallel capabilities of ParallelSSH. See <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a>.</p>
+<h2 id="execute">execute</h2>
+<p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/execute.py">source</a>)</p>
+<p>Fabric provides an interface for running commands in parallel using their global state manipulation mechanism and set of
+operations. It uses Python's <code>multiprocessing</code> module.</p>
+<p>Threadbare re-implements this mechanism in <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a>, also using <code>multiprocessing</code>.</p>
+<p>In Fabric the parallelism is used primarily to execute commands on multiple hosts simultaneously, so the interfaces are
+skewed towards that. Threadbare is more general purpose but provides the function <code>execute_with_hosts</code> that behaves as
+Fabric's <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a> does.</p>
+<p>Both Threadbare and Fabric share the same caveats of running code in different processes using <code>multiprocessing</code> with a
+mechanism for manipulating global state. </p>
+<ul>
+<li>changes to global state within the worker function does not propagate back to the parent</li>
+<li>SSH connections cannot be passed to child processes so new connections are made within the child process if necessary</li>
+<li>child processes cannot prompt for input. They have no access to stdin.</li>
+<li>child processes may die or throw exceptions that can't be properly handled in the parent</li>
+</ul>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import os
+if os.path.exists(&#34;README.md&#34;):
+    data = open(&#34;README.md&#34;).read()
+    __doc__ = str(data)
+
+# gevent is used by parallel-ssh which interferes with Python multiprocessing and futures
+# it can cause indefinite blocking.
+# this bit of magic appears to make everything work nicely with each other.
+# - http://www.gevent.org/api/gevent.monkey.html
+from gevent import monkey
+monkey.patch_all()
+
+
+from . import state, operations, execute
+
+assert state and operations and execute  # quieten pyflakes
+
+import logging
+
+disable_these_handlers = [&#34;pssh.host_logger&#34;, &#34;pssh.clients.native.single&#34;]
+for unwanted_logger in disable_these_handlers:
+    logger = logging.getLogger(unwanted_logger)
+    logger.setLevel(logging.CRITICAL)</code></pre>
+</details>
+</section>
+<section>
+<h2 class="section-title" id="header-submodules">Sub-modules</h2>
+<dl>
+<dt><code class="name"><a title="threadbare.common" href="common.html">threadbare.common</a></code></dt>
+<dd>
+<section class="desc"></section>
+</dd>
+<dt><code class="name"><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code></dt>
+<dd>
+<section class="desc"></section>
+</dd>
+<dt><code class="name"><a title="threadbare.operations" href="operations.html">threadbare.operations</a></code></dt>
+<dd>
+<section class="desc"></section>
+</dd>
+<dt><code class="name"><a title="threadbare.state" href="state.html">threadbare.state</a></code></dt>
+<dd>
+<section class="desc"></section>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul>
+<li><a href="#threadbare">Threadbare</a><ul>
+<li><a href="#usage">usage</a></li>
+<li><a href="#local-tests">local tests</a></li>
+<li><a href="#remote-tests">remote tests</a></li>
+<li><a href="#localremote-tests">local+remote tests</a></li>
+</ul>
+</li>
+<li><a href="#a-guide-to-threadbare-for-developers">a guide to Threadbare for developers</a><ul>
+<li><a href="#state">state</a></li>
+<li><a href="#operations">operations</a></li>
+<li><a href="#execute">execute</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<ul id="index">
+<li><h3><a href="#header-submodules">Sub-modules</a></h3>
+<ul>
+<li><code><a title="threadbare.common" href="common.html">threadbare.common</a></code></li>
+<li><code><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code></li>
+<li><code><a title="threadbare.operations" href="operations.html">threadbare.operations</a></code></li>
+<li><code><a title="threadbare.state" href="state.html">threadbare.state</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+</footer>
+<script src="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
