@@ -483,6 +483,47 @@ def test_check_many_remote_files():
         assert expected == result
 
 
+def test_line_formatting():
+    # todo: not a great test. how do I capture and test the formatted line while preserving the original output?
+    num_workers = 2
+
+    @execute.parallel
+    def workerfn():
+        iterations = 2
+        cmd = 'for run in {1..%s}; do echo "I am %s, iteration $run"; done' % (
+            iterations,
+            state.ENV["worker_num"],
+        )
+        return remote(cmd)
+
+    expected = [
+        {
+            "command": '/bin/bash -l -c "for run in {1..2}; do echo \\"I am 1, iteration \\$run\\"; done"',
+            "failed": False,
+            "return_code": 0,
+            "stderr": [],
+            "stdout": ["I am 1, iteration 1", "I am 1, iteration 2",],
+            "succeeded": True,
+        },
+        {
+            "command": '/bin/bash -l -c "for run in {1..2}; do echo \\"I am 2, iteration \\$run\\"; done"',
+            "failed": False,
+            "return_code": 0,
+            "stderr": [],
+            "stdout": ["I am 2, iteration 1", "I am 2, iteration 2"],
+            "succeeded": True,
+        },
+    ]
+
+    with test_settings(line_template="[{host}] {pipe}: {line}\n"):
+        results = execute.execute(
+            workerfn,
+            param_key="worker_num",
+            param_values=list(range(1, num_workers + 1)),
+        )
+    assert expected == results
+
+
 # see `threadbare/__init__.py` for gevent monkey patching that allows
 # gevent threads (pssh), python futures (boto) and python multiprocessing (threadbare/fabric)
 # to work harmoniously
