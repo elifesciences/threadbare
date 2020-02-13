@@ -333,10 +333,10 @@
     <meta name="description" content="${module.docstring | glimpse, trim, h}" />
   % endif
 
-  <link href='/docs/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
-  <link href='/docs/resources/third-party/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+  <link href='/threadbare/docs/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+  <link href='/threadbare/docs/resources/third-party/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
   % if syntax_highlighting:
-    <link href="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/styles/${hljs_style}.min.css" rel="stylesheet">
+    <link href="/threadbare/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/styles/${hljs_style}.min.css" rel="stylesheet">
   %endif
 
   <%namespace name="css" file="css.mako" />
@@ -366,7 +366,7 @@
 </footer>
 
 % if syntax_highlighting:
-    <script src="/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+    <script src="/threadbare/docs/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
     <script>hljs.initHighlightingOnLoad()</script>
 % endif
 
