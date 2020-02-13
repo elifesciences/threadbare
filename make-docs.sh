@@ -4,4 +4,4 @@
 set -e
 
 source venv/bin/activate
-pdoc --html --output-dir ./docs --force ./threadbare
+pdoc --html --template-dir ./docs-templates/ --output-dir ./docs --force ./threadbare
