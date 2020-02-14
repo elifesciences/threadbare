@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+
 try:
     # py3
     import unittest.mock as mock
@@ -9,7 +11,7 @@ except ImportError:
     from StringIO import StringIO
 
 import pytest
-from threadbare import operations, state
+from threadbare import operations, state, common
 from threadbare.common import merge, cwd, PromptedException
 from pssh import exceptions as pssh_exceptions
 
@@ -516,3 +518,16 @@ def test_formatted_output():
         result = operations._print_line(strbuffer, "hello, world!")
         assert expected_stdout == result
         assert expected_buffer == strbuffer.getvalue()
+
+
+def test_formatted_output_unicode():
+    "unicode output is correctly encoded before being formatted to avoid UnicodeEncodeErrors in python2"
+    line_template = "{line}"
+    if not common.PY3:
+        unicode_point = u"\u258e\u5b57 <-- omg, so fancy"
+    else:
+        unicode_point = "\u258e\u5b57 <-- omg, so fancy"
+    expected_stdout = "▎字 <-- omg, so fancy"
+    with state.settings(line_template=line_template):
+        result = operations._print_line(StringIO(), unicode_point)
+        assert expected_stdout == result
