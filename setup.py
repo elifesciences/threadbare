@@ -2,12 +2,14 @@ from setuptools import setup
 
 setup(
     name='threadbare',
-    version='1.1.3',
+    version='1.1.4',
     description='A Fabric and Paramiko replacement library',
     long_description="A partial replacement of the Fabric/Paramiko library utilising ParallelSSH.",
     url="https://github.com/elifesciences/threadbare",
-    maintainer="Luke (lsh)",
+    maintainer="Luke",
+    maintainer_email="lsh-0@users.noreply.github.com",
     install_requires=["parallel-ssh==1.9.1"],
+    packages=["threadbare"],
     classifiers=[
         "Intended Audience :: System Administrators",
         "Programming Language :: Python :: 2.7",
