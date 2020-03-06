@@ -1,6 +1,13 @@
 # Threadbare
 
-A partial replacement for the slice of Fabric 1.x and Paramiko used in [Builder](https://github.com/elifesciences/builder)
+A partial replacement for the slice of Fabric 1.x and Paramiko used in 
+[elifesciences/builder](https://github.com/elifesciences/builder).
+
+[Documentation](https://elifesciences.github.io/threadbare).
+
+## installation
+
+    pip install threadbare
 
 ## usage
 
