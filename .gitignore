@@ -8,3 +8,5 @@ threadbare.egg-info/
 .tox/
 .coverage
 htmlcov/
+dist/
+build/

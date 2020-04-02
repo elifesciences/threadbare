@@ -29,7 +29,7 @@ find threadbare/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 find tests/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 
 export THREADBARE_TEST_HOST=localhost
-export THREADBARE_TEST_PORT=2222
+export THREADBARE_TEST_PORT=8462
 export THREADBARE_TEST_USER="$USER"
 export THREADBARE_TEST_PUBKEY="/tmp/sshd-dummy/.ssh/dummy_user_key"
 
