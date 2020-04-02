@@ -1,5 +1,5 @@
 import pytest
-import os, sys
+import os
 from functools import partial
 from io import BytesIO
 from threadbare import execute, state, common
@@ -281,7 +281,7 @@ def test_remote_exceptions_in_parallel():
     object returned to the them as the result"""
 
     def workerfn():
-        with state.settings() as env:
+        with state.settings():
             return remote("exit 1")
 
     workerfn = execute.parallel(workerfn, pool_size=1)
@@ -341,6 +341,12 @@ def test_upload_and_download_a_file():
         assert data == "foobarbaz"
 
 
+def test_upload_and_download_a_file_using_sftp():
+    "same as `test_upload_and_download_a_file`, but using SFTP to transfer files"
+    with settings(transfer_protocol="sftp"):
+        test_upload_and_download_a_file()
+
+
 def test_upload_a_directory():  # you can't
     "attempting to upload a directory raises an exception"
     with test_settings():
@@ -349,6 +355,11 @@ def test_upload_a_directory():  # you can't
             assert False, "you shouldn't be able to upload a directory!"
         except ValueError:
             pass
+
+
+def test_upload_a_directory_using_sftp():  # you still can't
+    with settings(transfer_protocol="sftp"):
+        test_upload_a_directory()
 
 
 def test_download_a_directory():  # you can't
@@ -362,6 +373,11 @@ def test_download_a_directory():  # you can't
             pass
 
 
+def test_download_a_directory_using_sftp():  # you still can't
+    with settings(transfer_protocol="sftp"):
+        test_download_a_directory()
+
+
 def test_download_an_obvious_directory():  # you can't
     """attempting to download an obvious directory raises an exception.
     It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
@@ -371,6 +387,11 @@ def test_download_an_obvious_directory():  # you can't
             assert False, "you shouldn't be able to download a directory!"
         except ValueError:
             pass
+
+
+def test_download_an_obvious_directory_using_sftp():  # you still can't
+    with settings(transfer_protocol="sftp"):
+        test_download_an_obvious_directory()
 
 
 def test_download_a_file_to_a_directory():
@@ -387,6 +408,12 @@ def test_download_a_file_to_a_directory():
             local('rm -f "%s"' % expected_local_file)
 
 
+def test_download_a_file_to_a_directory_using_sftp():
+    "same as `test_download_a_file_to_a_directory` but using SFTP"
+    with settings(transfer_protocol="sftp"):
+        test_download_a_file_to_a_directory()
+
+
 def test_download_a_file_to_a_relative_directory():
     "relative destinations are expanded to full paths before downloading"
     with test_settings():
@@ -398,6 +425,11 @@ def test_download_a_file_to_a_relative_directory():
                 assert os.path.exists(expected_local_file)
             finally:
                 local('rm -f "%s"' % expected_local_file)
+
+
+def test_download_a_file_to_a_relative_directory_using_sftp():
+    with settings(transfer_protocol="sftp"):
+        test_download_a_file_to_a_relative_directory()
 
 
 def test_download_file_owned_by_root():
@@ -436,6 +468,11 @@ def test_download_file_owned_by_root():
         remote_sudo('rm -f "%s"' % remote_file_name)
 
 
+def test_download_file_owned_by_root_using_sftp():
+    with settings(transfer_protocol="sftp"):
+        test_download_file_owned_by_root()
+
+
 def test_upload_file_to_root_dir():
     "uploads a file as a regular user to the /root directory with `use_sudo`"
     with test_settings():
@@ -450,6 +487,11 @@ def test_upload_file_to_root_dir():
         LOG.debug("done uploading")
 
         assert remote_file_exists(remote_file_name, use_sudo=True)
+
+
+def test_upload_file_to_root_dir_using_sftp():
+    with settings(transfer_protocol="sftp"):
+        test_upload_file_to_root_dir()
 
 
 def test_upload_and_download_a_file_using_byte_buffers():
@@ -470,6 +512,11 @@ def test_upload_and_download_a_file_using_byte_buffers():
         download_unicode_buffer = BytesIO()
         download(remote_file_name, download_unicode_buffer)
         assert download_unicode_buffer.getvalue() == payload
+
+
+def test_upload_and_download_a_file_using_byte_buffers_and_sftp():
+    with settings(transfer_protocol="sftp"):
+        test_upload_and_download_a_file_using_byte_buffers()
 
 
 def test_check_remote_files():

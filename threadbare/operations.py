@@ -18,6 +18,7 @@ from .common import (
     sudo_wrap_command,
     cwd_wrap_command,
     shell_wrap_command,
+    ensure,
 )
 
 
@@ -103,7 +104,7 @@ def handle(base_kwargs, kwargs):
 @contextlib.contextmanager
 def lcd(local_dir):
     "temporarily changes the local working directory"
-    assert os.path.isdir(local_dir), "not a directory: %s" % local_dir
+    ensure(os.path.isdir(local_dir), "not a directory: %s" % local_dir)
     with state.settings():
         current_dir = cwd()
         state.add_cleanup(lambda: os.chdir(current_dir))
@@ -527,6 +528,48 @@ def prompt(msg):
         return input("> ")
 
 
+#
+# uploads and downloads
+#
+
+
+def _transfer_fn(client, direction, **kwargs):
+    base_kwargs = {
+        # TODO: support an 'overwrite?' option?
+        # sftp is *exceptionally* slow so use SCP as a default:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        "transfer_protocol": "scp"
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    upload_backends = {
+        "sftp": client.copy_file,
+        "scp": client.scp_send,
+    }
+
+    download_backends = {
+        "sftp": client.copy_remote_file,
+        "scp": client.scp_recv,
+    }
+
+    direction_map = {"upload": upload_backends, "download": download_backends}
+    ensure(
+        direction in direction_map,
+        "you can 'upload' or 'download' but not %r" % (direction,),
+    )
+
+    backend_map = direction_map[direction]
+    transfer_protocol = final_kwargs["transfer_protocol"]
+    ensure(
+        transfer_protocol in backend_map,
+        "unhandled transfer protocol %r; supported protocols: %s"
+        % (transfer_protocol, ", ".join(backend_map.keys())),
+    )
+
+    transfer_fn = direction_map[direction][transfer_protocol]
+    return transfer_fn
+
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
 # use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
 def _download_as_root_hack(remote_path, local_path, **kwargs):
@@ -553,9 +596,10 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
     )
     result = remote_sudo(cmd, **kwargs)
     remote_tempfile = result["stdout"][-1]
-    # assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
     remote_path = remote_tempfile
-    client.copy_remote_file(remote_tempfile, local_path)
+
+    transfer_fn = _transfer_fn(client, "download", **kwargs)
+    transfer_fn(remote_tempfile, local_path)
     remote_sudo('rm "%s"' % remote_tempfile, **kwargs)
     return local_path
 
@@ -565,8 +609,6 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
 def download(remote_path, local_path, use_sudo=False, **kwargs):
     """downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
     avoid `use_sudo` if at all possible"""
-
-    # TODO: support an 'overwrite?' option?
 
     with state.settings(quiet=True):
         if remote_path.endswith("/"):
@@ -603,7 +645,8 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
                     "remote file does not exist: %s" % (remote_path,)
                 )
             client = _ssh_client(**kwargs)
-            client.copy_remote_file(remote_path, local_path)
+            transfer_fn = _transfer_fn(client, "download")
+            transfer_fn(remote_path, local_path)
 
         if temp_file:
             bytes_buffer.write(open(local_path, "rb").read())
@@ -628,12 +671,20 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
     )
     result = remote(cmd, **kwargs)
     remote_temp_path = result["stdout"][-1]
-    assert remote_file_exists(remote_temp_path, **kwargs)  # sanity check
+    ensure(
+        remote_file_exists(remote_temp_path, **kwargs),
+        "remote temporary file %r (%s) does not exist"
+        % (remote_temp_path, remote_path),
+    )
 
-    client.copy_file(local_path, remote_temp_path)
+    transfer_fn = _transfer_fn(client, "upload")
+    transfer_fn(local_path, remote_temp_path)
     move_file_into_place = 'mv "%s" "%s"' % (remote_temp_path, remote_path)
     remote_sudo(move_file_into_place, **kwargs)
-    assert remote_file_exists(remote_path, use_sudo=True, **kwargs)
+    ensure(
+        remote_file_exists(remote_path, use_sudo=True, **kwargs),
+        "remote path does not exist: %s" % (remote_path),
+    )
 
 
 def _write_bytes_to_temporary_file(local_path):
@@ -653,6 +704,7 @@ def _write_bytes_to_temporary_file(local_path):
 
 def upload(local_path, remote_path, use_sudo=False, **kwargs):
     "uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path"
+
     with state.settings(quiet=True):
 
         # bytes handling
@@ -669,13 +721,6 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
         if not os.path.exists(local_path):
             raise EnvironmentError("local file does not exist: %s" % (local_path,))
 
-        # you're not crazy, sftp is *exceptionally* slow:
-        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-        # local('du -sh %s' % local_path)
-        # client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
         client = _ssh_client(**kwargs)
-        # print('client',client)
-        client.copy_file(local_path, remote_path)
-        # client.pool.join()
-        # print('done')
-        # client.disconnect()
+        transfer_fn = _transfer_fn(client, "upload", **kwargs)
+        transfer_fn(local_path, remote_path)
