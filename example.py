@@ -1,5 +1,5 @@
 import pytest
-import os
+import os, sys
 from functools import partial
 from io import BytesIO
 from threadbare import execute, state, common
@@ -274,6 +274,25 @@ def test_run_many_remote_commands_in_parallel():
         results = execute.execute(myfn, param_key="cmd", param_values=command_list)
         assert len(results) == len(command_list)
         assert results[-2]["stdout"][0] == "are executed"
+
+
+def test_remote_exceptions_in_parallel():
+    """remote commands that raise exceptions while running in parallel have the exception 
+    object returned to the them as the result"""
+
+    def workerfn():
+        with state.settings() as env:
+            return remote("exit 1")
+
+    workerfn = execute.parallel(workerfn, pool_size=1)
+
+    with test_settings():
+        expected = RuntimeError(
+            "remote() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
+        )
+        result_list = execute.execute(workerfn)
+        result = result_list[0]
+        assert str(expected) == str(result)
 
 
 def _upload_a_file(local_file_name):
