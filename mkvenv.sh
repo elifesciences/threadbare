@@ -2,7 +2,7 @@
 set -e
 
 python=''
-pybinlist=("python3.6" "python3.5" "python3.4")
+pybinlist=("python3.6" "python3.5" "python3.4" "python2.7")
 
 for pybin in ${pybinlist[*]}; do
     which "$pybin" &> /dev/null || continue
@@ -18,7 +18,11 @@ fi
 if [ ! -e "venv/bin/$python" ]; then
     echo "could not find venv/bin/$python, recreating venv"
     rm -rf venv
-    $python -m venv venv
+    if [ "$python" = "python2.7" ]; then
+        virtualenv2 venv
+    else
+        $python -m venv venv
+    fi
 else
     echo "using $python"
 fi
