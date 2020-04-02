@@ -9,7 +9,7 @@ temp_dir="/tmp/sshd-dummy"
 echo "---------------"
 echo "looking for dummy ssh server"
 die=false
-exec 6<>/dev/tcp/localhost/2222 || {
+exec 6<>/dev/tcp/localhost/8462 || {
     die=true
 }
 
@@ -25,7 +25,7 @@ echo "found."
 echo "---------------"
 
 export THREADBARE_TEST_HOST=localhost
-export THREADBARE_TEST_PORT=2222
+export THREADBARE_TEST_PORT=8462
 export THREADBARE_TEST_USER="$USER"
 export THREADBARE_TEST_PUBKEY="$temp_dir/.ssh/dummy_user_key"
 source venv/bin/activate

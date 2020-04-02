@@ -12,7 +12,7 @@ dev=${1:-""}
 if [ "$dev" = "dev" ]; then
     shift # pop the first arg off
     source venv/bin/activate
-    if [ -z "$@" ]; then
+    if [ -z "$1" ]; then
         # no further args passed to test script
         # run with coverage and reporting enabled
         PYTHONPATH=threadbare/ python -m pytest \
@@ -28,7 +28,7 @@ if [ "$dev" = "dev" ]; then
             -vv \
             --cov=threadbare/ \
             --cov-report html --cov-report term \
-            -k "$@"
+            "$@"
     fi
 else
     tox --parallel auto "$@"

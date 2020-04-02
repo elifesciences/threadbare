@@ -21,5 +21,5 @@ ssh \
     -o IdentitiesOnly=yes \
     -o IdentityFile="$temp_dir/.ssh/dummy_user_key" \
     -o LogLevel=ERROR \
-    "$USER"@localhost -p 2222 \
+    "$USER"@localhost -p 8462 \
     "echo 'success!'"
