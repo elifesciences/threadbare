@@ -358,7 +358,8 @@ def remote(command, **kwargs):
     )
 
     if final_kwargs["warn_only"]:
-        LOG.warning(err_msg)
+        if not final_kwargs["quiet"]:
+            LOG.warning(err_msg)
         return result
 
     abort_exc_klass = final_kwargs["abort_exception"]
@@ -722,7 +723,6 @@ def _write_bytes_to_temporary_file(local_path):
 
 def upload(local_path, remote_path, use_sudo=False, **kwargs):
     "uploads file at `local_path` to the given `remote_path`, overwriting anything that may be at that path"
-
     with state.settings(quiet=True):
 
         # bytes handling
