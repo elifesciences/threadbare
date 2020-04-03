@@ -25,7 +25,7 @@ logging.basicConfig()
 
 LOG = logging.getLogger(__name__)
 
-HOST = "localhost"  # os.environ.get("THREADBARE_TEST_HOST")
+HOST = "localhost"
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
