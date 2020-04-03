@@ -419,6 +419,7 @@ def remote_file_exists(path, **kwargs):
 def local(command, **kwargs):
     "preprocesses given `command` and options before executing it locally using Python's `subprocess.Popen`"
     base_kwargs = {
+        "use_sudo": False,
         "use_shell": True,
         "combine_stderr": True,
         "capture": False,
@@ -459,6 +460,10 @@ def local(command, **kwargs):
 
     if final_kwargs["use_shell"]:
         command = shell_wrap_command(command)
+
+    # todo: new feature, tests!
+    if final_kwargs["use_sudo"]:
+        command = sudo_wrap_command(command)
 
     proc = subprocess.Popen(
         command, shell=final_kwargs["use_shell"], stdout=out_stream, stderr=err_stream
@@ -614,8 +619,10 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
         if remote_path.endswith("/"):
             raise ValueError("directory downloads are not supported")
 
-        # do not raise an exception if remote file doesn't exist
-        result = remote('test -d "%s"' % remote_path, use_sudo=use_sudo, warn_only=True)
+        # do not raise an exception if remote path is a directory
+        result = remote(
+            'test -d "%s"' % remote_path, use_sudo=use_sudo, warn_only=True, quiet=True
+        )
         remote_path_is_dir = result["succeeded"]
         if remote_path_is_dir:
             raise ValueError("directory downloads are not supported")
@@ -646,7 +653,13 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
                 )
             client = _ssh_client(**kwargs)
             transfer_fn = _transfer_fn(client, "download")
-            transfer_fn(remote_path, local_path)
+
+            try:
+                transfer_fn(remote_path, local_path)
+            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+                # even after ensuring the file is there and can be downloaded, there may
+                # be a permissions or network issue or something that causes a problem.
+                raise NetworkError(exc)
 
         if temp_file:
             bytes_buffer.write(open(local_path, "rb").read())
@@ -723,4 +736,9 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
 
         client = _ssh_client(**kwargs)
         transfer_fn = _transfer_fn(client, "upload", **kwargs)
-        transfer_fn(local_path, remote_path)
+
+        try:
+            transfer_fn(local_path, remote_path)
+        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            # there may be a permissions or network issue or something that causes a problem.
+            raise NetworkError(exc)

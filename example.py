@@ -1,8 +1,11 @@
+import contextlib
 import pytest
-import os
+import os, shutil, tempfile
+from os.path import join, basename
 from functools import partial
 from io import BytesIO
-from threadbare import execute, state, common
+from threadbare import execute, state, common, operations
+from threadbare.common import first
 from threadbare.state import settings
 from threadbare.operations import (
     remote,
@@ -22,24 +25,74 @@ logging.basicConfig()
 
 LOG = logging.getLogger(__name__)
 
-HOST = os.environ.get("THREADBARE_TEST_HOST")
+HOST = "localhost"  # os.environ.get("THREADBARE_TEST_HOST")
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
 
 _help_text = """the environment variables below must be defined before executing this script:
-THREADBARE_TEST_HOST=
 THREADBARE_TEST_PORT=
 THREADBARE_TEST_USER=
 THREADBARE_TEST_PUBKEY=
 
-and THREADBARE_TEST_PORT must be an integer.
+THREADBARE_TEST_PORT must be an integer.
+
+It's assumed the dummy sshd server is running and that the host is `localhost`.
 """
 assert (HOST and PORT and USER) and common.isint(PORT), _help_text
 
 test_settings = partial(
     settings, user=USER, port=int(PORT), host_string=HOST, key_filename=KEY
 )
+
+
+def _env(prefix):
+    @contextlib.contextmanager
+    def wrapper():
+        tempdir = tempfile.mkdtemp(prefix="threadbare-" + prefix)
+
+        # create some empty files of specific sizes
+        path_map = {
+            "small-file": (join(tempdir, "small-file.temp"), "1KiB"),
+            "medium-file": (join(tempdir, "medium-file.temp"), "1MiB"),
+            "large-file": (join(tempdir, "large-file.temp"), "25MiB"),
+        }
+        for path, file_size in path_map.values():
+            local("fallocate -l %s %s" % (file_size, path))
+
+        try:
+            yield {"temp-dir": tempdir, "temp-files": path_map}
+        finally:
+            # permissions may have been modified that make clean up awkward
+            local('chown %s:%s -R "%s"' % (USER, USER, tempdir), use_sudo=True)
+            shutil.rmtree(tempdir)
+
+    return wrapper
+
+
+def _empty_env(prefix):
+    @contextlib.contextmanager
+    def wrapper():
+        tempdir = tempfile.mkdtemp(prefix="threadbare-" + prefix)
+        try:
+            yield {"temp-dir": tempdir}
+        finally:
+            local('chown %s:%s -R "%s"' % (USER, USER, tempdir), use_sudo=True)
+            shutil.rmtree(tempdir)
+
+    return wrapper
+
+
+# pytest fixtures turned out to be too brittle and too magical. I'd rather nested context managers.
+# remote_env = pytest.fixture(_env("remote"))
+# local_env = pytest.fixture(_env("local"))
+# empty_local_env = pytest.fixture(_empty_env("local"))
+# empty_remote_env = pytest.fixture(_empty_env("remote"))
+
+# remote and local are the same but lets pretend they're not.
+empty_remote_env, remote_env = _empty_env("remote"), _env("remote")
+empty_local_env, local_env = _empty_env("local"), _env("local")
+
 
 # local tests
 # see `tests/test_state.py` and `tests/test_operations.py` for more examples
@@ -122,6 +175,8 @@ def test_run_many_local_commands_in_parallel():
 
 
 # remote tests
+# these assume the dummy sshd server (configured in `./tests-remote/sshd-server.sh`) is being
+# run and that both local and remote are the same machine.
 
 
 def test_run_a_remote_command():
@@ -129,14 +184,6 @@ def test_run_a_remote_command():
     with test_settings(quiet=True):
         result = remote(r'echo -e "\e[31mRed Text!!\e[0m"')
         assert result["succeeded"]
-
-
-def test_run_a_remote_command_in_a_different_dir():
-    "run a simple `remote` command in a different remote directory"
-    with test_settings():
-        with rcd("/tmp"):
-            result = remote("pwd")
-            assert result["succeeded"]
 
 
 def test_run_a_remote_command_but_hide_output():
@@ -156,22 +203,39 @@ def test_run_a_remote_command_as_root():
         assert result["succeeded"]
 
 
+def test_run_a_remote_command_in_a_different_dir():
+    "run a simple `remote` command in a different remote directory"
+    with remote_env() as env:
+        with test_settings():
+            temp_dir = env["temp-dir"]
+            with rcd(temp_dir):
+                result = remote("pwd")
+    assert result["succeeded"]
+    assert temp_dir == first(result["stdout"])
+
+
 def test_run_a_remote_command_with_separate_streams():
     "run a simple `remote` command and capture stdout and stderr separately"
     with test_settings():
         result = remote(
-            'echo "standard out"; >&2 echo "standard error"', combine_stderr=False,
+            'echo "printed to standard out"; >&2 echo "printed to standard error"',
+            combine_stderr=False,
         )
         assert result["succeeded"]
-        assert result["stdout"] == ["standard out"]
-        assert result["stderr"] == ["standard error"]
+        assert ["printed to standard out"] == result["stdout"]
+        assert ["printed to standard error"] == result["stderr"]
 
 
 def test_run_a_remote_command_with_shell_interpolation():
-    "run a simple `remote` command including variables"
+    "run a simple `remote` command including shell variables"
     with test_settings(quiet=True):
-        assert remote('foo=bar; echo "bar? $foo!"')["succeeded"]
-        assert remote('foo=bar; echo "bar? $foo!"', use_shell=False)["succeeded"]
+        result = remote('foo=baz; echo "bar? $foo!"')
+        assert result["succeeded"]
+        assert ["bar? baz!"] == result["stdout"]
+
+        result2 = remote('foo=baz; echo "bar? $foo!"', use_shell=False)
+        assert result2["succeeded"]
+        assert ["bar? baz!"] == result["stdout"]
 
 
 def test_run_a_remote_command_non_zero_return_code():
@@ -222,7 +286,7 @@ def test_run_many_remote_commands():
 
 
 def test_run_many_remote_commands_singly():
-    "running many `remote` commands re-uses the established ssh session"
+    "multiple commands can be concatenated into a single command"
     command_list = [
         "echo all",
         "echo these commands",
@@ -235,10 +299,9 @@ def test_run_many_remote_commands_singly():
 
 
 def test_run_many_remote_commands_serially():
-    """run a list of `remote` commands serially. `remote` commands run serially 
-    with `execute` do not share a ssh connection (at time of writing)
-    TODO: investigate above statement. explain why
-    """
+    """run a list of `remote` commands serially.
+    The `execute` module is aimed at running commands in parallel. 
+    Serial execution exists only as a sensible default and offers nothing extra."""
     command_list = [
         "echo all",
         "echo these commands",
@@ -277,8 +340,7 @@ def test_run_many_remote_commands_in_parallel():
 
 
 def test_remote_exceptions_in_parallel():
-    """remote commands that raise exceptions while running in parallel have the exception 
-    object returned to the them as the result"""
+    """Remote commands that raise exceptions while executing in parallel return the exception object."""
 
     def workerfn():
         with state.settings():
@@ -295,66 +357,61 @@ def test_remote_exceptions_in_parallel():
         assert str(expected) == str(result)
 
 
-def _upload_a_file(local_file_name):
-    local_file_contents = "foo"
-    with open(local_file_name, "w") as fh:
-        fh.write(local_file_contents)
-    remote_file_name = "/tmp/threadbare-payload.tmp1"
-    upload(local_file_name, remote_file_name)
-    assert remote_file_exists(remote_file_name)
-    return remote_file_name
-
-
-def _modify_remote_file(remote_file_name):
-    remote('printf "bar" >> %s' % remote_file_name)
-
-
-def _download_a_file(remote_file_name):
-    new_local_file_name = "/tmp/threadbare-payload.tmp2"
-    download(remote_file_name, new_local_file_name)
-    remote("rm %s" % remote_file_name)
-    return new_local_file_name
-
-
-def _modify_local_file(local_file_name):
-    local('printf "baz" >> %s' % local_file_name)
+def test_check_remote_files():
+    "check that remote files can be found (or not)"
+    with remote_env() as remote_env_data:
+        with test_settings():
+            file_that_exists = join(remote_env_data["temp-files"]["small-file"][0])
+            file_that_does_not_exist = join(
+                remote_env_data["temp-dir"], "doesnot.exist"
+            )
+            assert remote_file_exists(file_that_exists)
+            assert not remote_file_exists(file_that_does_not_exist)
 
 
 def test_upload_and_download_a_file():
     "write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, assert it's contents are as expected"
-    with test_settings():
-        LOG.debug("uploading file ...")
-        local_file_name = "/tmp/threadbare-payload.tmp"
-        uploaded_file = _upload_a_file(local_file_name)
 
-        LOG.debug("modifying remote file ...")
-        _modify_remote_file(uploaded_file)
+    with empty_local_env() as local_env:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                LOG.debug("modifying local file ...")
+                local_file_name = join(local_env["temp-dir"], "foo")
+                local('printf "foo" > %s' % local_file_name)
 
-        LOG.debug("downloading file ...")
-        new_local_file_name = _download_a_file(uploaded_file)
+                LOG.debug("uploading file ...")
+                remote_file_name = join(remote_env["temp-dir"], "foobar")
+                upload(local_file_name, remote_file_name)
+                assert remote_file_exists(remote_file_name)
 
-        LOG.debug("modifying local file ...")
-        _modify_local_file(new_local_file_name)
+                LOG.debug("modifying remote file ...")
+                remote('printf "bar" >> %s' % remote_file_name)
 
-        LOG.debug("testing local file ...")
-        data = open(new_local_file_name, "r").read()
-        assert data == "foobarbaz"
+                LOG.debug("downloading file ...")
+                new_local_file_name = join(local_env["temp-dir"], "foobarbaz")
+                download(remote_file_name, new_local_file_name)
+
+                LOG.debug("modifying local file (again) ...")
+                local('printf "baz" >> %s' % new_local_file_name)
+
+                LOG.debug("testing local file ...")
+                data = open(new_local_file_name, "r").read()
+                assert "foobarbaz" == data
 
 
 def test_upload_and_download_a_file_using_sftp():
     "same as `test_upload_and_download_a_file`, but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
-        test_upload_and_download_a_file()
+        return test_upload_and_download_a_file()
 
 
 def test_upload_a_directory():  # you can't
     "attempting to upload a directory raises an exception"
-    with test_settings():
-        try:
-            upload("/tmp", "/tmp")
-            assert False, "you shouldn't be able to upload a directory!"
-        except ValueError:
-            pass
+    with empty_local_env() as local_env:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                with pytest.raises(ValueError):
+                    upload(local_env["temp-dir"], remote_env["temp-dir"])
 
 
 def test_upload_a_directory_using_sftp():  # you still can't
@@ -365,12 +422,14 @@ def test_upload_a_directory_using_sftp():  # you still can't
 def test_download_a_directory():  # you can't
     """attempting to download a directory raises an exception.
     It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
-    with test_settings():
-        try:
-            download("/tmp", "/tmp")
-            assert False, "you shouldn't be able to download a directory!"
-        except ValueError:
-            pass
+    with empty_local_env() as local_env:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                # it becomes ambiguous if remote path is a file or a directory
+                remote_dir = remote_env["temp-dir"]
+                assert not remote_dir.endswith("/")
+                with pytest.raises(ValueError):
+                    download(remote_dir, local_env["temp-dir"])
 
 
 def test_download_a_directory_using_sftp():  # you still can't
@@ -381,12 +440,13 @@ def test_download_a_directory_using_sftp():  # you still can't
 def test_download_an_obvious_directory():  # you can't
     """attempting to download an obvious directory raises an exception.
     It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
-    with test_settings():
-        try:
-            download("/tmp/", "/tmp")
-            assert False, "you shouldn't be able to download a directory!"
-        except ValueError:
-            pass
+    with empty_local_env() as local_env:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                # ensure we're dealing with an obvious directory
+                remote_dir = "%s/" % remote_env["temp-dir"].rstrip("/")
+                with pytest.raises(ValueError):
+                    download(remote_dir, local_env["temp-dir"])
 
 
 def test_download_an_obvious_directory_using_sftp():  # you still can't
@@ -396,16 +456,16 @@ def test_download_an_obvious_directory_using_sftp():  # you still can't
 
 def test_download_a_file_to_a_directory():
     """a file can be downloaded to a directory and the name of the remote file will be used as the destination file"""
-    with test_settings():
-        local_dir = "/tmp"
-        remote_file = "/bin/less"
-        expected_local_file = "/tmp/less"
-        try:
-            new_local_file = download(remote_file, local_dir)
-            assert expected_local_file == new_local_file
-            assert os.path.exists(expected_local_file)
-        finally:
-            local('rm -f "%s"' % expected_local_file)
+    with empty_local_env() as local_env:
+        with remote_env() as remote_env_data:
+            with test_settings():
+                local_dir = local_env["temp-dir"]
+                remote_file = remote_env_data["temp-files"]["small-file"][0]
+                expected_local_file = join(local_dir, basename(remote_file))
+
+                new_local_file = download(remote_file, local_dir)
+                assert os.path.exists(expected_local_file)
+                assert expected_local_file == new_local_file
 
 
 def test_download_a_file_to_a_directory_using_sftp():
@@ -416,15 +476,18 @@ def test_download_a_file_to_a_directory_using_sftp():
 
 def test_download_a_file_to_a_relative_directory():
     "relative destinations are expanded to full paths before downloading"
-    with test_settings():
-        with lcd("/tmp"):
-            try:
-                expected_local_file = "/tmp/less"
-                new_local_file = download("/bin/less", ".")
-                assert expected_local_file == new_local_file
-                assert os.path.exists(expected_local_file)
-            finally:
-                local('rm -f "%s"' % expected_local_file)
+    with remote_env() as remote_env_data:
+        with empty_local_env() as local_env:
+            with test_settings():
+                with lcd(local_env["temp-dir"]):
+                    remote_file = remote_env_data["temp-files"]["small-file"][0]
+                    expected_local_file = join(
+                        local_env["temp-dir"], basename(remote_file)
+                    )
+
+                    new_local_file = download(remote_file, ".")
+                    assert expected_local_file == new_local_file
+                    assert os.path.exists(expected_local_file)
 
 
 def test_download_a_file_to_a_relative_directory_using_sftp():
@@ -434,38 +497,29 @@ def test_download_a_file_to_a_relative_directory_using_sftp():
 
 def test_download_file_owned_by_root():
     "a file owned by root can be downloaded by the regular user if 'use_sudo' is True"
-    with test_settings():
-        # create a root-only file on remote machine
-        remote_file_name = "/root/threadbare-test.temp"
-        file_contents = "root users only!\n"
-        remote_sudo(
-            single_command(
-                [
-                    'printf "%s" > "%s"' % (file_contents, remote_file_name),
-                    'chmod 600 "%s"' % remote_file_name,
-                ]
-            )
-        )
+    with empty_local_env() as local_env:
+        with remote_env() as remote_env_data:
+            with test_settings():
+                # create a root-only file on remote machine
+                remote_file_name = remote_env_data["temp-files"]["small-file"][0]
+                file_contents = "root users only!\n"
+                remote_sudo('printf "%s" > "%s"' % (file_contents, remote_file_name))
+                remote_sudo('chmod 600 "%s"' % remote_file_name)
+                remote_sudo('chown root:root "%s"' % remote_file_name)
 
-        # ensure local file doesn't exist
-        local_file_name = "/tmp/threadbare-test.temp"
-        local('rm -f "%s"' % local_file_name)
+                local_file_name = join(
+                    local_env["temp-dir"], basename(remote_file_name)
+                )
 
-        # ensure remote root-only file cannot be seen or downloaded by regular user
-        try:
-            download(remote_file_name, local_file_name)
-            assert False, "remote file shouldn't be detectable!"
-        except EnvironmentError:
-            # file undetectable by regular user!
-            pass
+                # ensure remote root-only file cannot be downloaded by regular user.
+                # in this case we own the directory but the file is owned by root.
+                with pytest.raises(operations.NetworkError):
+                    download(remote_file_name, local_file_name)
 
-        # download remote root-only file as regular user
-        download(remote_file_name, local_file_name, use_sudo=True)
-        assert os.path.exists(local_file_name)
-        assert open(local_file_name, "r").read() == file_contents
-
-        # cleanup. remove remote root-only file
-        remote_sudo('rm -f "%s"' % remote_file_name)
+                # download remote root-only file as regular user
+                download(remote_file_name, local_file_name, use_sudo=True)
+                assert os.path.exists(local_file_name)
+                assert file_contents == open(local_file_name, "r").read()
 
 
 def test_download_file_owned_by_root_using_sftp():
@@ -474,58 +528,54 @@ def test_download_file_owned_by_root_using_sftp():
 
 
 def test_upload_file_to_root_dir():
-    "uploads a file as a regular user to the /root directory with `use_sudo`"
-    with test_settings():
-        remote_file_name = "/root/threadbare-test.temp"
-        remote_sudo('rm -f "%s"' % remote_file_name)  # sanity check
-        assert not remote_file_exists(remote_file_name, use_sudo=True)
+    "uploads a file as a regular user to a root-owned directory with `use_sudo`"
+    with local_env() as local_env_data:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                remote_sudo('chown root:root -R "%s"' % remote_env["temp-dir"])
 
-        local_file_name = "/tmp/threadbare-test.temp"
-        local('echo foobarbaz > "%s"' % local_file_name)
-        LOG.debug("uploading file (this is *very* slow over SFTP)")
-        upload(local_file_name, remote_file_name, use_sudo=True)
-        LOG.debug("done uploading")
+                local_file_name = local_env_data["temp-files"]["small-file"][0]
+                remote_file_name = join(
+                    remote_env["temp-dir"], basename(local_file_name)
+                )
 
-        assert remote_file_exists(remote_file_name, use_sudo=True)
+                with pytest.raises(operations.NetworkError):
+                    upload(local_file_name, remote_file_name)
+
+                upload(local_file_name, remote_file_name, use_sudo=True)
+                assert remote_file_exists(remote_file_name, use_sudo=True)
 
 
 def test_upload_file_to_root_dir_using_sftp():
     with settings(transfer_protocol="sftp"):
+        LOG.debug("(this is *very* slow over SFTP)")
         test_upload_file_to_root_dir()
 
 
 def test_upload_and_download_a_file_using_byte_buffers():
     """contents of a BytesIO buffer can be uploaded to a remote file, 
     and the contents of a remote file can be downloaded to a BytesIO buffer"""
-    with test_settings(quiet=True):
-        payload = b"foobarbaz"
+    with empty_remote_env() as remote_env:
+        with test_settings(quiet=True):
+            payload = b"foo-bar-baz"
+            uploadable_unicode_buffer = BytesIO(payload)
+            remote_file_name = join(remote_env["temp-dir"], "bytes-test")
 
-        uploadable_unicode_buffer = BytesIO(payload)
-        remote_file_name = "/tmp/threadbare-bytes-test.temp"
-        upload(uploadable_unicode_buffer, remote_file_name)
+            upload(uploadable_unicode_buffer, remote_file_name)
+            assert remote_file_exists(remote_file_name)
 
-        assert remote_file_exists(remote_file_name)
-        result = remote('cat "%s"' % remote_file_name)
-        assert result["succeeded"]
-        assert result["stdout"][0] == payload.decode()
+            result = remote('cat "%s"' % remote_file_name)
+            assert result["succeeded"]
+            assert result["stdout"][0] == payload.decode()
 
-        download_unicode_buffer = BytesIO()
-        download(remote_file_name, download_unicode_buffer)
-        assert download_unicode_buffer.getvalue() == payload
+            download_unicode_buffer = BytesIO()
+            download(remote_file_name, download_unicode_buffer)
+            assert download_unicode_buffer.getvalue() == payload
 
 
 def test_upload_and_download_a_file_using_byte_buffers_and_sftp():
     with settings(transfer_protocol="sftp"):
         test_upload_and_download_a_file_using_byte_buffers()
-
-
-def test_check_remote_files():
-    "check that remote files can be found (or not)"
-    file_that_exists = "/var/log/wtmp"  # login/logout entries (see `man last`)
-    file_that_does_not_exist = "/foo/bar"
-    with test_settings():
-        assert remote_file_exists(file_that_exists)
-        assert not remote_file_exists(file_that_does_not_exist)
 
 
 def test_check_many_remote_files():
@@ -536,17 +586,18 @@ def test_check_many_remote_files():
         with state.settings() as env:
             return remote_file_exists(env["remote_file"], use_sudo=True)
 
-    with test_settings():
+    with remote_env() as remote_env_data:
         remote_file_list = [
-            "/var/log/wtmp",  # True, exists
-            "/foo/bar",  # False, doesn't exist
+            remote_env_data["temp-files"]["small-file"][0],  # True, exists
+            join(remote_env_data["temp-dir"], "doesnot.exist"),  # False, doesn't exist
         ]
 
         expected = [True, False]
-        result = execute.execute(
-            workerfn, param_key="remote_file", param_values=remote_file_list
-        )
-        assert expected == result
+        with test_settings():
+            result = execute.execute(
+                workerfn, param_key="remote_file", param_values=remote_file_list
+            )
+            assert expected == result
 
 
 def test_line_formatting():
