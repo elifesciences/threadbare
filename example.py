@@ -415,13 +415,14 @@ def test_upload_a_directory():  # you can't
 
 
 def test_upload_a_directory_using_sftp():  # you still can't
+    "same as `test_upload_a_directory` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_upload_a_directory()
 
 
 def test_download_a_directory():  # you can't
-    """attempting to download a directory raises an exception.
-    It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
+    "attempting to download a directory raises an exception."
+    # it's possible, both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
     with empty_local_env() as local_env:
         with empty_remote_env() as remote_env:
             with test_settings():
@@ -433,6 +434,7 @@ def test_download_a_directory():  # you can't
 
 
 def test_download_a_directory_using_sftp():  # you still can't
+    "same as `test_download_a_directory` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_download_a_directory()
 
@@ -450,6 +452,7 @@ def test_download_an_obvious_directory():  # you can't
 
 
 def test_download_an_obvious_directory_using_sftp():  # you still can't
+    "same as `test_download_an_obvious_directory` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_download_an_obvious_directory()
 
@@ -491,6 +494,7 @@ def test_download_a_file_to_a_relative_directory():
 
 
 def test_download_a_file_to_a_relative_directory_using_sftp():
+    "same as `test_download_a_file_to_a_relative_directory` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_download_a_file_to_a_relative_directory()
 
@@ -523,6 +527,7 @@ def test_download_file_owned_by_root():
 
 
 def test_download_file_owned_by_root_using_sftp():
+    "same as `test_download_file_owned_by_root` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_download_file_owned_by_root()
 
@@ -547,6 +552,7 @@ def test_upload_file_to_root_dir():
 
 
 def test_upload_file_to_root_dir_using_sftp():
+    "same as `test_upload_file_to_root_dir` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         LOG.debug("(this is *very* slow over SFTP)")
         test_upload_file_to_root_dir()
@@ -574,6 +580,7 @@ def test_upload_and_download_a_file_using_byte_buffers():
 
 
 def test_upload_and_download_a_file_using_byte_buffers_and_sftp():
+    "same as `test_upload_and_download_a_file_using_byte_buffers` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_upload_and_download_a_file_using_byte_buffers()
 

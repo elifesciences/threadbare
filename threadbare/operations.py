@@ -539,15 +539,20 @@ def prompt(msg):
 
 
 def _transfer_fn(client, direction, **kwargs):
+    """returns the `client` object's appropriate transfer *method* given a `direction`.
+    `direction` is either 'upload' or 'download'.
+    Also accepts the `transfer_protocol` keyword parameter that is either 'scp' (default) or 'sftp'."""
     base_kwargs = {
         # TODO: support an 'overwrite?' option?
-        # sftp is *exceptionally* slow so use SCP as a default:
+        # sftp is *exceptionally* slow so SCP is used by default.
+        # paramiko's own Python implementation is faster than native SFTP but slower than SCP:
         # - https://github.com/ParallelSSH/parallel-ssh/issues/177
         "transfer_protocol": "scp"
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
     upload_backends = {
+        # rsync? pigeon?
         "sftp": client.copy_file,
         "scp": client.scp_send,
     }
