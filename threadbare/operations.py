@@ -562,7 +562,7 @@ def _transfer_fn(client, direction, **kwargs):
     def upload_fn(fn):
         @wraps(fn)
         def wrapper(local_file, remote_file):
-            if remote_file_exists and not final_kwargs["overwrite"]:
+            if remote_file_exists(remote_file) and not final_kwargs["overwrite"]:
                 raise NetworkError(
                     "Remote file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
                     % (remote_file,)
