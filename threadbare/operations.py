@@ -647,9 +647,17 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
     remote_path = remote_tempfile
 
     transfer_fn = _transfer_fn(client, "download", **kwargs)
-    transfer_fn(remote_tempfile, local_path)
-    remote_sudo('rm "%s"' % remote_tempfile, **kwargs)
-    return local_path
+
+    try:
+        transfer_fn(remote_tempfile, local_path)
+        return local_path
+
+    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        # permissions or network issues may cause these
+        raise NetworkError(exc)
+
+    finally:
+        remote_sudo('rm -f "%s"' % remote_tempfile, **kwargs)
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
@@ -700,8 +708,7 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
             try:
                 transfer_fn(remote_path, local_path)
             except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
-                # even after ensuring the file is there and can be downloaded, there may
-                # be a permissions or network issue or something that causes a problem.
+                # permissions or network issues may cause these
                 raise NetworkError(exc)
 
         if temp_file:
@@ -734,13 +741,18 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
     )
 
     transfer_fn = _transfer_fn(client, "upload", **kwargs)
-    transfer_fn(local_path, remote_temp_path)
-    move_file_into_place = 'mv "%s" "%s"' % (remote_temp_path, remote_path)
-    remote_sudo(move_file_into_place, **kwargs)
-    ensure(
-        remote_file_exists(remote_path, use_sudo=True, **kwargs),
-        "remote path does not exist: %s" % (remote_path),
-    )
+
+    try:
+        transfer_fn(local_path, remote_temp_path)
+        move_file_into_place = 'mv "%s" "%s"' % (remote_temp_path, remote_path)
+        remote_sudo(move_file_into_place, **kwargs)
+        ensure(
+            remote_file_exists(remote_path, use_sudo=True, **kwargs),
+            "remote path does not exist: %s" % (remote_path),
+        )
+    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        # permissions or network issues may cause these
+        raise NetworkError(exc)
 
 
 def _write_bytes_to_temporary_file(local_path):
@@ -782,5 +794,5 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
             transfer_fn = _transfer_fn(client, "upload", **kwargs)
             transfer_fn(local_path, remote_path)
         except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
-            # there may be a permissions or network issue or something that causes a problem.
+            # permissions or network issues may cause these
             raise NetworkError(exc)

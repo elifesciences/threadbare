@@ -6,7 +6,6 @@ from os.path import join, basename
 from functools import partial
 from io import BytesIO
 from threadbare import execute, state, common, operations
-from threadbare.common import first
 from threadbare.state import settings
 from threadbare.operations import (
     remote,
@@ -47,7 +46,11 @@ test_settings = partial(
 )
 
 
+# todo: rename _env_fixture
 def _env(prefix):
+    """creates a temporary directory with three files in it, 'small-file', 'medium-file' and 'large-file'.
+    the paths to the directory and files are yielded as a map and then all is removed afterwards."""
+
     @contextlib.contextmanager
     def wrapper():
         tempdir = tempfile.mkdtemp(prefix="threadbare-" + prefix)
@@ -64,7 +67,7 @@ def _env(prefix):
         try:
             yield {"temp-dir": tempdir, "temp-files": path_map}
         finally:
-            # permissions may have been modified that make clean up awkward
+            # permissions on temp dir may have changed. make sure we can still remove it.
             local('chown %s:%s -R "%s"' % (USER, USER, tempdir), use_sudo=True)
             shutil.rmtree(tempdir)
 
@@ -72,12 +75,15 @@ def _env(prefix):
 
 
 def _empty_env(prefix):
+    "creates a temporary directory with no files in it, yields the directory name and cleans itself up afterwards."
+
     @contextlib.contextmanager
     def wrapper():
         tempdir = tempfile.mkdtemp(prefix="threadbare-" + prefix)
         try:
             yield {"temp-dir": tempdir}
         finally:
+            # permissions on temp dir may have changed. make sure we can still remove it.
             local('chown %s:%s -R "%s"' % (USER, USER, tempdir), use_sudo=True)
             shutil.rmtree(tempdir)
 
@@ -206,13 +212,13 @@ def test_run_a_remote_command_as_root():
 
 def test_run_a_remote_command_in_a_different_dir():
     "run a simple `remote` command in a different remote directory"
-    with remote_env() as env:
+    with remote_env() as remote_env_data:
         with test_settings():
-            temp_dir = env["temp-dir"]
-            with rcd(temp_dir):
+            remote_dir = remote_env_data["temp-dir"]
+            with rcd(remote_dir):
                 result = remote("pwd")
     assert result["succeeded"]
-    assert temp_dir == first(result["stdout"])
+    assert [remote_dir] == result["stdout"]
 
 
 def test_run_a_remote_command_with_separate_streams():
@@ -300,8 +306,8 @@ def test_run_many_remote_commands_singly():
 
 
 def test_run_many_remote_commands_serially():
-    """run a list of `remote` commands serially.
-    The `execute` module is aimed at running commands in parallel. 
+    """run a list of `remote` commands serially. The `execute` module is aimed at 
+    running commands in parallel. 
     Serial execution exists only as a sensible default and offers nothing extra."""
     command_list = [
         "echo all",
@@ -371,7 +377,8 @@ def test_check_remote_files():
 
 
 def test_upload_and_download_a_file():
-    "write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, assert it's contents are as expected"
+    """write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, 
+    assert it's contents are as expected"""
     with empty_local_env() as local_env:
         with empty_remote_env() as remote_env:
             with test_settings():
@@ -385,7 +392,8 @@ def test_upload_and_download_a_file():
                 # verify contents
                 assert remote_file_exists(remote_file_name)
 
-                time.sleep(2) # I think we're checking the file too quickly! 
+                # these aren't working anymore
+                #time.sleep(2)  # I think we're checking the file too quickly!
 
                 assert remote("cat %s" % remote_file_name)["stdout"] == ["foo"]
 
@@ -398,7 +406,7 @@ def test_upload_and_download_a_file():
                 new_local_file_name = join(local_env["temp-dir"], "foobarbaz")
                 download(remote_file_name, new_local_file_name)
                 # verify contents
-                assert open(new_local_file_name, 'r').read() == "foobar"
+                assert open(new_local_file_name, "r").read() == "foobar"
 
                 LOG.debug("modifying local file (again) ...")
                 local('printf "baz" >> %s' % new_local_file_name)
@@ -524,7 +532,7 @@ def test_download_to_extant_local_file_no_overwrite_using_sftp():
 
 def test_download_a_directory():  # you can't
     "attempting to download a directory raises an exception."
-    # it's possible, both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
+    # its possible as both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
     with empty_local_env() as local_env:
         with empty_remote_env() as remote_env:
             with test_settings():
@@ -542,8 +550,8 @@ def test_download_a_directory_using_sftp():  # you still can't
 
 
 def test_download_an_obvious_directory():  # you can't
-    """attempting to download an obvious directory raises an exception.
-    It's possible, both parallel-ssh and paramiko use SFTP, but not supported."""
+    """attempting to download an obvious directory (trailing slash /) raises an exception.
+    Its possible as both parallel-ssh and paramiko use SFTP, but not supported."""
     with empty_local_env() as local_env:
         with empty_remote_env() as remote_env:
             with test_settings():
@@ -560,7 +568,7 @@ def test_download_an_obvious_directory_using_sftp():  # you still can't
 
 
 def test_download_a_file_to_a_directory():
-    """a file can be downloaded to a directory and the name of the remote file will be used as the destination file"""
+    "a file can be downloaded to a directory and the name of the remote file will be used as the destination file"
     with empty_local_env() as local_env:
         with remote_env() as remote_env_data:
             with test_settings():
@@ -646,6 +654,7 @@ def test_upload_file_to_root_dir():
                     remote_env["temp-dir"], basename(local_file_name)
                 )
 
+                # upload file to root-owned directory
                 with pytest.raises(operations.NetworkError):
                     upload(local_file_name, remote_file_name)
 
@@ -672,7 +681,8 @@ def test_upload_and_download_a_file_using_byte_buffers():
             upload(uploadable_unicode_buffer, remote_file_name)
             assert remote_file_exists(remote_file_name)
 
-            time.sleep(2) # I think we're checking the file too quickly! 
+            # these aren't working anymore
+            #time.sleep(2)  # I think we're checking the file too quickly!
 
             result = remote('cat "%s"' % remote_file_name)
             assert result["succeeded"]
