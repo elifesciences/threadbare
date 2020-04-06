@@ -385,7 +385,7 @@ def test_upload_and_download_a_file():
                 # verify contents
                 assert remote_file_exists(remote_file_name)
 
-                time.sleep(0.5) # I think we're checking the file too quickly! 
+                time.sleep(1) # I think we're checking the file too quickly! 
 
                 assert remote("cat %s" % remote_file_name)["stdout"] == ["foo"]
 
@@ -672,11 +672,11 @@ def test_upload_and_download_a_file_using_byte_buffers():
             upload(uploadable_unicode_buffer, remote_file_name)
             assert remote_file_exists(remote_file_name)
 
-            time.sleep(0.5) # I think we're checking the file too quickly! 
+            time.sleep(1) # I think we're checking the file too quickly! 
 
             result = remote('cat "%s"' % remote_file_name)
             assert result["succeeded"]
-            assert result["stdout"][0] == payload.decode()
+            assert result["stdout"] == [payload.decode()]
 
             download_unicode_buffer = BytesIO()
             download(remote_file_name, download_unicode_buffer)
