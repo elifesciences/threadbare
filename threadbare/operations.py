@@ -1,3 +1,4 @@
+from functools import wraps
 from datetime import datetime
 import tempfile
 import contextlib
@@ -7,6 +8,7 @@ import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from pssh.clients.native import SSHClient as PSSHClient
+import gevent
 import logging
 from . import state, common
 from .common import (
@@ -42,6 +44,11 @@ class NetworkError(BaseException):
         self.wrapped = wrapped_exception_inst
 
     def __str__(self):
+        # for cases where we want the convenient:
+        #   `raise NetworkError("some network problem")`
+        if isinstance(self.wrapped, str):
+            return self.wrapped
+
         # we have the opportunity here to tweak the error messages to make them
         # similar to their equivalents in Fabric.
         # original error messages are still available via `str(excinst.wrapped)`
@@ -544,13 +551,39 @@ def _transfer_fn(client, direction, **kwargs):
     `direction` is either 'upload' or 'download'.
     Also accepts the `transfer_protocol` keyword parameter that is either 'scp' (default) or 'sftp'."""
     base_kwargs = {
-        # TODO: support an 'overwrite?' option?
+        "overwrite": True,
         # sftp is *exceptionally* slow so SCP is used by default.
         # paramiko's own Python implementation is faster than native SFTP but slower than SCP:
         # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-        "transfer_protocol": "scp"
+        "transfer_protocol": "scp",
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    def upload_fn(fn):
+        @wraps(fn)
+        def wrapper(local_file, remote_file):
+            if remote_file_exists and not final_kwargs["overwrite"]:
+                raise NetworkError(
+                    "Remote file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
+                    % (remote_file,)
+                )
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
+            return gevent.joinall(fn(local_file, remote_file), raise_error=True)[0]
+
+        return wrapper
+
+    def download_fn(fn):
+        @wraps(fn)
+        def wrapper(remote_file, local_file):
+            if not final_kwargs["overwrite"] and os.path.exists(local_file):
+                raise NetworkError(
+                    "Local file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
+                    % (local_file,)
+                )
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
+            return gevent.joinall(fn(remote_file, local_file), raise_error=True)[0]
+
+        return wrapper
 
     upload_backends = {
         # rsync? pigeon?
@@ -578,7 +611,11 @@ def _transfer_fn(client, direction, **kwargs):
     )
 
     transfer_fn = direction_map[direction][transfer_protocol]
-    return transfer_fn
+
+    direction_wrapper_map = {"upload": upload_fn, "download": download_fn}
+    wrapper_fn = direction_wrapper_map[direction]
+
+    return wrapper_fn(transfer_fn)
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
@@ -658,7 +695,7 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
                     "remote file does not exist: %s" % (remote_path,)
                 )
             client = _ssh_client(**kwargs)
-            transfer_fn = _transfer_fn(client, "download")
+            transfer_fn = _transfer_fn(client, "download", **kwargs)
 
             try:
                 transfer_fn(remote_path, local_path)
@@ -696,7 +733,7 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
         % (remote_temp_path, remote_path),
     )
 
-    transfer_fn = _transfer_fn(client, "upload")
+    transfer_fn = _transfer_fn(client, "upload", **kwargs)
     transfer_fn(local_path, remote_temp_path)
     move_file_into_place = 'mv "%s" "%s"' % (remote_temp_path, remote_path)
     remote_sudo(move_file_into_place, **kwargs)
@@ -740,9 +777,9 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
             raise EnvironmentError("local file does not exist: %s" % (local_path,))
 
         client = _ssh_client(**kwargs)
-        transfer_fn = _transfer_fn(client, "upload", **kwargs)
 
         try:
+            transfer_fn = _transfer_fn(client, "upload", **kwargs)
             transfer_fn(local_path, remote_path)
         except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
             # there may be a permissions or network issue or something that causes a problem.

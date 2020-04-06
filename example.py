@@ -1,3 +1,4 @@
+import time
 import contextlib
 import pytest
 import os, shutil, tempfile
@@ -371,7 +372,6 @@ def test_check_remote_files():
 
 def test_upload_and_download_a_file():
     "write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, assert it's contents are as expected"
-
     with empty_local_env() as local_env:
         with empty_remote_env() as remote_env:
             with test_settings():
@@ -382,14 +382,23 @@ def test_upload_and_download_a_file():
                 LOG.debug("uploading file ...")
                 remote_file_name = join(remote_env["temp-dir"], "foobar")
                 upload(local_file_name, remote_file_name)
+                # verify contents
                 assert remote_file_exists(remote_file_name)
+
+                time.sleep(2) # I think we're checking the file too quickly! 
+
+                assert remote("cat %s" % remote_file_name)["stdout"] == ["foo"]
 
                 LOG.debug("modifying remote file ...")
                 remote('printf "bar" >> %s' % remote_file_name)
+                # verify contents
+                assert remote("cat %s" % remote_file_name)["stdout"] == ["foobar"]
 
                 LOG.debug("downloading file ...")
                 new_local_file_name = join(local_env["temp-dir"], "foobarbaz")
                 download(remote_file_name, new_local_file_name)
+                # verify contents
+                assert open(new_local_file_name, 'r').read() == "foobar"
 
                 LOG.debug("modifying local file (again) ...")
                 local('printf "baz" >> %s' % new_local_file_name)
@@ -418,6 +427,99 @@ def test_upload_a_directory_using_sftp():  # you still can't
     "same as `test_upload_a_directory` but using SFTP to transfer files"
     with settings(transfer_protocol="sftp"):
         test_upload_a_directory()
+
+
+def test_upload_to_extant_remote_file():
+    "the default policy is to overwrite files that exist."
+    with empty_local_env():
+        with remote_env() as remote_env_data:
+            with test_settings():
+                payload = b"foo"
+                remote_file = remote_env_data["temp-files"]["small-file"][0]
+
+                # just to illustrate an overwrite *is* happening
+                assert remote_file_exists(remote_file)
+                upload(BytesIO(payload), remote_file)
+                result = remote('cat "%s"' % (remote_file,))
+                assert payload.decode("utf-8") == result["stdout"][0]
+
+
+def test_upload_to_extant_remote_file_using_sftp():
+    "same as `test_upload_to_extant_remote_file` but using SFTP to transfer files"
+    with settings(transfer_protocol="sftp"):
+        test_upload_to_extant_remote_file()
+
+
+def test_upload_to_extant_remote_file_no_overwrite():
+    "The default policy of overwriting files can be disabled when `override` is set to `False`."
+    with empty_local_env():
+        with remote_env() as remote_env_data:
+            with test_settings():
+                payload = b"foo"
+                remote_file = remote_env_data["temp-files"]["small-file"][0]
+                assert remote_file_exists(remote_file)
+                with pytest.raises(operations.NetworkError) as exc_info:
+                    upload(BytesIO(payload), remote_file, overwrite=False)
+
+                expected_msg = (
+                    "Remote file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
+                    % (remote_file,)
+                )
+                assert expected_msg == str(exc_info.value)
+
+
+def test_upload_to_extant_remote_file_no_overwrite_using_sftp():
+    "same as `test_upload_to_extant_remote_file_no_overwrite` but using SFTP to transfer files."
+    with settings(transfer_protocol="sftp"):
+        test_upload_to_extant_remote_file_no_overwrite()
+
+
+def test_download_to_extant_local_file():
+    "the default policy is to overwrite files that exist."
+    with local_env() as local_env_data:
+        with empty_remote_env() as remote_env:
+            with test_settings():
+                local_file = local_env_data["temp-files"]["small-file"][0]
+                assert os.path.exists(local_file)
+
+                payload = "foo"
+                remote_file = join(remote_env["temp-dir"], "foo.file")
+                remote('printf %s > "%s"' % (payload, remote_file))
+                assert remote_file_exists(remote_file)
+
+                download(remote_file, local_file)
+                result = open(local_file, "r").read()
+                assert payload == result
+
+
+def test_download_to_extant_local_file_using_sftp():
+    "same as `test_download_to_extant_local_file` but using SFTP to transfer files"
+    with settings(transfer_protocol="sftp"):
+        test_download_to_extant_local_file()
+
+
+def test_download_to_extant_local_file_no_overwrite():
+    "the default policy of overwriting files can be disabled when `override` is set to `False`."
+    with local_env() as local_env_data:
+        with remote_env() as remote_env_data:
+            with test_settings():
+                local_file = local_env_data["temp-files"]["small-file"][0]
+                remote_file = remote_env_data["temp-files"]["medium-file"][0]
+
+                with pytest.raises(operations.NetworkError) as exc_info:
+                    download(remote_file, local_file, overwrite=False)
+
+                expected_msg = (
+                    "Local file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
+                    % (local_file,)
+                )
+                assert expected_msg == str(exc_info.value)
+
+
+def test_download_to_extant_local_file_no_overwrite_using_sftp():
+    "same as `test_download_to_extant_local_file_no_overwrite` but using SFTP to transfer files."
+    with settings(transfer_protocol="sftp"):
+        test_download_to_extant_local_file_no_overwrite()
 
 
 def test_download_a_directory():  # you can't
@@ -570,9 +672,11 @@ def test_upload_and_download_a_file_using_byte_buffers():
             upload(uploadable_unicode_buffer, remote_file_name)
             assert remote_file_exists(remote_file_name)
 
+            time.sleep(2) # I think we're checking the file too quickly! 
+
             result = remote('cat "%s"' % remote_file_name)
             assert result["succeeded"]
-            assert result["stdout"][0] == payload.decode()
+            assert result["stdout"] == [payload.decode()]
 
             download_unicode_buffer = BytesIO()
             download(remote_file_name, download_unicode_buffer)
