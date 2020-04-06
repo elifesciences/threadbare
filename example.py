@@ -420,6 +420,51 @@ def test_upload_a_directory_using_sftp():  # you still can't
         test_upload_a_directory()
 
 
+def test_upload_to_extant_remote_file():
+    """the default policy is to overwrite files that exist.
+    SFTP does this without prompting however SCP raises an error so threadbare 
+    handles any further testing prior to upload."""
+    with empty_local_env():
+        with remote_env() as remote_env_data:
+            with test_settings():
+                payload = b"foo"
+                remote_file = remote_env_data["temp-files"]["small-file"][0]
+
+                # just to illustrate an overwrite *is* happening
+                assert remote_file_exists(remote_file)
+                upload(BytesIO(payload), remote_file)
+                result = remote('cat "%s"' % (remote_file,))
+                assert payload.decode("utf-8") == result["stdout"][0]
+
+
+def test_upload_to_extant_remote_file_using_sftp():
+    with settings(transfer_protocol="sftp"):
+        test_upload_to_extant_remote_file()
+
+
+def test_upload_to_extant_remote_file_no_overwrite():
+    "The default policy of overwriting files can be disabled when `override` is `False`."
+    with empty_local_env():
+        with remote_env() as remote_env_data:
+            with test_settings():
+                payload = b"foo"
+                remote_file = remote_env_data["temp-files"]["small-file"][0]
+                assert remote_file_exists(remote_file)
+                with pytest.raises(operations.NetworkError) as exc_info:
+                    upload(BytesIO(payload), remote_file, overwrite=False)
+
+                expected_msg = (
+                    "Remote file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
+                    % (remote_file,)
+                )
+                assert expected_msg == str(exc_info.value)
+
+
+def test_upload_to_extant_remote_file_using_sftp_no_overwrite():
+    with settings(transfer_protocol="sftp"):
+        test_upload_to_extant_remote_file_no_overwrite()
+
+
 def test_download_a_directory():  # you can't
     "attempting to download a directory raises an exception."
     # it's possible, both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
