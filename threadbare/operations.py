@@ -575,7 +575,7 @@ def _transfer_fn(client, direction, **kwargs):
         def wrapper(remote_file, local_file):
             if not final_kwargs["overwrite"] and os.path.exists(local_file):
                 raise NetworkError(
-                    "Local file exists and 'overwrite' is to 'False'. Refusing to write: %s"
+                    "Local file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
                     % (local_file,)
                 )
             return fn(remote_file, local_file)
