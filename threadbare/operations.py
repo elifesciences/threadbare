@@ -588,7 +588,7 @@ def _transfer_fn(client, direction, **kwargs):
     upload_backends = {
         # rsync? pigeon?
         "sftp": client.copy_file,
-        "scp": client.scp_send,
+        "scp": client._scp_send,
     }
 
     download_backends = {
