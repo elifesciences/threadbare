@@ -1,3 +1,4 @@
+import time
 import contextlib
 import pytest
 import os, shutil, tempfile
@@ -383,6 +384,9 @@ def test_upload_and_download_a_file():
                 upload(local_file_name, remote_file_name)
                 # verify contents
                 assert remote_file_exists(remote_file_name)
+
+                time.sleep(0.5) # I think we're checking the file too quickly! 
+
                 assert remote("cat %s" % remote_file_name)["stdout"] == ["foo"]
 
                 LOG.debug("modifying remote file ...")
@@ -667,6 +671,8 @@ def test_upload_and_download_a_file_using_byte_buffers():
 
             upload(uploadable_unicode_buffer, remote_file_name)
             assert remote_file_exists(remote_file_name)
+
+            time.sleep(0.5) # I think we're checking the file too quickly! 
 
             result = remote('cat "%s"' % remote_file_name)
             assert result["succeeded"]
