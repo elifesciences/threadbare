@@ -381,14 +381,20 @@ def test_upload_and_download_a_file():
                 LOG.debug("uploading file ...")
                 remote_file_name = join(remote_env["temp-dir"], "foobar")
                 upload(local_file_name, remote_file_name)
+                # verify contents
                 assert remote_file_exists(remote_file_name)
+                assert remote("cat %s" % remote_file)["stdout"][0] == "foo"
 
                 LOG.debug("modifying remote file ...")
                 remote('printf "bar" >> %s' % remote_file_name)
+                # verify contents
+                assert remote("cat %s" % remote_file)["stdout"][0] == "foobar"
 
                 LOG.debug("downloading file ...")
                 new_local_file_name = join(local_env["temp-dir"], "foobarbaz")
                 download(remote_file_name, new_local_file_name)
+                # verify contents
+                assert local("cat %s" % local_file)["stdout"][0] == "foobar"
 
                 LOG.debug("modifying local file (again) ...")
                 local('printf "baz" >> %s' % new_local_file_name)
