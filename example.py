@@ -398,8 +398,6 @@ def test_upload_and_download_a_file():
                 # huh, they do it too:
                 # https://github.com/ParallelSSH/parallel-ssh/blob/379b8713fa79592b7e45ee4c9b8715efa36e525e/tests/test_native_parallel_client.py#L1283
 
-                time.sleep(3)
-
                 assert remote("cat %s" % remote_file_name)["stdout"] == ["foo"]
 
                 LOG.debug("modifying remote file ...")
@@ -688,8 +686,6 @@ def test_upload_and_download_a_file_using_byte_buffers():
 
             # these aren't working anymore
             #time.sleep(2)  # I think we're checking the file too quickly!
-
-            time.sleep(3)
 
             result = remote('cat "%s"' % remote_file_name)
             assert result["succeeded"]

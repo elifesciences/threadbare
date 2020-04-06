@@ -568,7 +568,16 @@ def _transfer_fn(client, direction, **kwargs):
                     % (remote_file,)
                 )
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
-            return gevent.joinall(fn(local_file, remote_file), raise_error=True)[0]
+            assert gevent.joinall(fn(local_file, remote_file), raise_error=True)[0], "upload failed"
+
+            # total hack, trying to figure out why file is taking so long to have it's contents written
+            num_attempts = 5
+            for attempt_n in range(0, num_attempts):
+                print('polling for remote file, attempt %s' % attempt_n)
+                if remote_file_exists(remote_file):
+                    break
+                if attempt_n == (num_attempts - 1):
+                    print('failed to find remote file after %s attempts' % num_attempts)
 
         return wrapper
 
