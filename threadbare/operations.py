@@ -568,7 +568,7 @@ def _transfer_fn(client, direction, **kwargs):
                     % (remote_file,)
                 )
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
-            gevent.joinall(fn(local_file, remote_file), raise_error=True)
+            assert gevent.joinall(fn(local_file, remote_file), raise_error=True)[0], "upload failed"
 
         return wrapper
 
@@ -581,7 +581,7 @@ def _transfer_fn(client, direction, **kwargs):
                     % (local_file,)
                 )
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
-            gevent.joinall(fn(remote_file, local_file), raise_error=True)
+            assert gevent.joinall(fn(remote_file, local_file), raise_error=True)[0], "download failed"
 
         return wrapper
 
