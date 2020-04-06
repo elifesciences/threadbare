@@ -8,6 +8,7 @@ import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from pssh.clients.native import SSHClient as PSSHClient
+import gevent
 import logging
 from . import state, common
 from .common import (
@@ -566,7 +567,8 @@ def _transfer_fn(client, direction, **kwargs):
                     "Remote file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
                     % (remote_file,)
                 )
-            return fn(local_file, remote_file)
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
+            gevent.joinall(fn(local_file, remote_file), raise_error=True)
 
         return wrapper
 
@@ -578,7 +580,8 @@ def _transfer_fn(client, direction, **kwargs):
                     "Local file exists and 'overwrite' is set to 'False'. Refusing to write: %s"
                     % (local_file,)
                 )
-            return fn(remote_file, local_file)
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
+            gevent.joinall(fn(remote_file, local_file), raise_error=True)
 
         return wrapper
 
