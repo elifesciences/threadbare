@@ -574,7 +574,11 @@ def _transfer_fn(client, direction, **kwargs):
             # were either missing or had empty bodies. SFTP seemed to be fine.
             # This sanity check seems to fix the issue (lending more credence to my theory it's an unflushed buffer somewhere),
             # when waiting 3 seconds between upload of file and check of file was still failing.
-            ensure(remote_file_exists(remote_file, **kwargs), "failed to upload file, remote file does not exist: %s" % (remote_file,))
+            ensure(
+                remote_file_exists(remote_file, **kwargs),
+                "failed to upload file, remote file does not exist: %s"
+                % (remote_file,),
+            )
 
         return wrapper
 
