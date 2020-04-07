@@ -568,16 +568,20 @@ def _transfer_fn(client, direction, **kwargs):
                     % (remote_file,)
                 )
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
-            assert gevent.joinall(fn(local_file, remote_file), raise_error=True)[0], "upload failed"
+            gevent.joinall(fn(local_file, remote_file), raise_error=True)
 
-            # total hack, trying to figure out why file is taking so long to have it's contents written
-            num_attempts = 5
+            ensure(remote_file_exists(remote_file), "failed to upload file, remote file does not exist")
+            '''
+            # total hack, trying to figure out why SCP upload is taking so long to have it's contents written.
+            # feels like a buffer isn't being flushed.
+            num_attempts = 3
             for attempt_n in range(0, num_attempts):
                 print('polling for remote file, attempt %s' % attempt_n)
                 if remote_file_exists(remote_file):
                     break
                 if attempt_n == (num_attempts - 1):
                     print('failed to find remote file after %s attempts' % num_attempts)
+            '''
 
         return wrapper
 
@@ -590,7 +594,7 @@ def _transfer_fn(client, direction, **kwargs):
                     % (local_file,)
                 )
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
-            return gevent.joinall(fn(remote_file, local_file), raise_error=True)[0]
+            gevent.joinall(fn(remote_file, local_file), raise_error=True)
 
         return wrapper
 
