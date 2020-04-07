@@ -469,9 +469,12 @@ def local(command, **kwargs):
     if final_kwargs["use_shell"]:
         command = shell_wrap_command(command)
 
-    # todo: new feature, tests!
     if final_kwargs["use_sudo"]:
-        command = sudo_wrap_command(command)
+        if final_kwargs["use_shell"]:
+            command = sudo_wrap_command(command)
+        else:
+            # lsh@2020-04: is this good enough? nothing uses local+noshell+sudo
+            command = ["sudo", "--non-interactive"] + command
 
     proc = subprocess.Popen(
         command, shell=final_kwargs["use_shell"], stdout=out_stream, stderr=err_stream
