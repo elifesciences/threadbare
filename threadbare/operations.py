@@ -570,18 +570,11 @@ def _transfer_fn(client, direction, **kwargs):
             # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
             gevent.joinall(fn(local_file, remote_file), raise_error=True)
 
-            ensure(remote_file_exists(remote_file), "failed to upload file, remote file does not exist")
-            '''
-            # total hack, trying to figure out why SCP upload is taking so long to have it's contents written.
-            # feels like a buffer isn't being flushed.
-            num_attempts = 3
-            for attempt_n in range(0, num_attempts):
-                print('polling for remote file, attempt %s' % attempt_n)
-                if remote_file_exists(remote_file):
-                    break
-                if attempt_n == (num_attempts - 1):
-                    print('failed to find remote file after %s attempts' % num_attempts)
-            '''
+            # lsh@2020-04, local testing didn't reveal anything but small files uploaded via SCP SCP during CI
+            # were either missing or had empty bodies. SFTP seemed to be fine.
+            # This sanity check seems to fix the issue (lending more credence to my theory it's an unflushed buffer somewhere),
+            # when waiting 3 seconds between upload of file and check of file was still failing.
+            ensure(remote_file_exists(remote_file, **kwargs), "failed to upload file, remote file does not exist: %s" % (remote_file,))
 
         return wrapper
 
