@@ -24,7 +24,6 @@ fi
 echo "found."
 echo "---------------"
 
-export THREADBARE_TEST_HOST=localhost
 export THREADBARE_TEST_PORT=8462
 export THREADBARE_TEST_USER="$USER"
 export THREADBARE_TEST_PUBKEY="$temp_dir/.ssh/dummy_user_key"

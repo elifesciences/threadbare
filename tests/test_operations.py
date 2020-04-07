@@ -317,6 +317,36 @@ def test_local_shell_command_capture():
     assert expected == actual
 
 
+def test_local_shell_sudo_command():
+    "local commands are run as root when `use_sudo` is `True`"
+    command = 'sudo echo "hello world"'
+    expected = {
+        "succeeded": True,
+        "failed": False,
+        "return_code": 0,
+        "command": 'sudo --non-interactive /bin/bash -l -c "sudo echo \\"hello world\\""',
+        "stdout": [],
+        "stderr": [],
+    }
+    actual = operations.local(command, use_sudo=True)
+    assert expected == actual
+
+
+def test_local_shell_sudo_command_capture():
+    "local sudo commands have their output captured as expected"
+    command = 'sudo echo "hello world"'
+    expected = {
+        "succeeded": True,
+        "failed": False,
+        "return_code": 0,
+        "command": 'sudo --non-interactive /bin/bash -l -c "sudo echo \\"hello world\\""',
+        "stdout": ["hello world"],
+        "stderr": [],
+    }
+    actual = operations.local(command, capture=True, use_sudo=True)
+    assert expected == actual
+
+
 def test_local_command():
     "non-shell commands must pass their command as a list of arguments"
     command = ["echo", "hello world"]
@@ -344,6 +374,36 @@ def test_local_command_capture():
         "stderr": [],
     }
     actual = operations.local(command, capture=True, use_shell=False)
+    assert expected == actual
+
+
+def test_local_sudo_command():
+    "non-shell sudo commands have 'sudo' added to the command argument list"
+    command = ["echo", "hello world"]
+    expected = {
+        "succeeded": True,
+        "failed": False,
+        "return_code": 0,
+        "command": ["sudo", "--non-interactive", "echo", "hello world"],
+        "stdout": [],
+        "stderr": [],
+    }
+    actual = operations.local(command, use_shell=False, use_sudo=True)
+    assert expected == actual
+
+
+def test_local_sudo_command_capture():
+    "non-shell sudo commands continue to capture output as expected"
+    command = ["echo", "hello world"]
+    expected = {
+        "succeeded": True,
+        "failed": False,
+        "return_code": 0,
+        "command": ["sudo", "--non-interactive", "echo", "hello world"],
+        "stdout": ["hello world"],
+        "stderr": [],
+    }
+    actual = operations.local(command, capture=True, use_shell=False, use_sudo=True)
     assert expected == actual
 
 
