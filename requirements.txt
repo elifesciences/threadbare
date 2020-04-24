@@ -1,3 +1,4 @@
+gevent==1.4.0
 parallel-ssh
 pytest
 pytest-cov

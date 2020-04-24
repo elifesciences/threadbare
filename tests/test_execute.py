@@ -1,5 +1,7 @@
 import pytest
 import time
+import logging
+from unittest.mock import patch
 from threadbare import execute, operations
 from threadbare.state import settings
 from threadbare.common import PromptedException
@@ -310,3 +312,37 @@ def test_execute_with_prompts_override():
     expected = EOFError("EOF when reading a line")
 
     assert str(expected) == str(results[0])
+
+
+def test_execute_process_not_terminating(caplog):
+    """we've had a case where a parallel process doesn't terminate despite the 
+    worker function having finished and returned a result.
+    This test simulates that scenario (because I can't replicate it under test conditions) 
+    by patching `process_status` to always return `alive=True`"""
+
+    # keep a reference before mock.patch overrides it
+    orig_fn = execute.process_status
+
+    def patch_fn(running_p):
+        result = orig_fn(running_p)
+        # why on earth are you *still* alive??
+        result["alive"] = True
+        return result
+
+    @execute.parallel
+    def worker_fn():
+        return "foo"
+
+    expected = "foo"
+
+    with patch("threadbare.execute.process_status", new=patch_fn):
+        results = execute.execute(worker_fn)
+        assert [expected] == results
+
+    # ensure a warning was logged
+
+    _, log_level, log_msg = caplog.record_tuples[0]
+    assert log_level == logging.WARNING
+
+    expected_warning_text = "process is still alive despite worker having completed. terminating process: process--1"
+    assert expected_warning_text == log_msg
