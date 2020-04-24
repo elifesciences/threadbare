@@ -115,28 +115,33 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
         # don't poll for results, don't wait to finish, just return the list of running processes
         return results_q, pool
 
+    result_list = [results_q.get(block=True) for _ in range(len(pool))]
+    time.sleep(
+        0.1
+    )  # there is a slight delay between a result appearing and the process exiting
+    results_q.close()
+
     result_map = {}  # {process-name: process-results, ...}
 
-    # poll the processes until all are complete
-    # remove process from pool when it is complete
-    while len(pool) > 0:
-        for idx, running_p in enumerate(pool):
-            result = process_status(running_p)
-            if not result["alive"]:
-                result_map[result["name"]] = result
-                del pool[idx]
-        # introduces the slightest of delays so that we're not manically polling every microsecond
-        time.sleep(0.1)
+    # all processes are done, they have yielded results and we can finish up now.
+    # there is a case where a worker has yielded results but the process hasn't ended.
+    # to solve this we terminate the process and issue a warning.
+    for idx, p in enumerate(pool):
+        status = process_status(p)
+        if status["alive"]:
+            # print("process is still alive despite worker having completed. terminating process: %s" % p)
+            p.terminate()
+            # this should report that the process *was* killed, but the return code should remain the same.
+            status = process_status(p)
+
+        result = process_status(p)
+        result_map[result["name"]] = status
 
     # all processes are complete
-    # empty the queue and marry the results to their process results using their 'name'
-
-    while not results_q.empty():
-        job_result = results_q.get()
+    # marry the results to their process results using their 'name'
+    for job_result in result_list:
         job_name = job_result["name"]
         result_map[job_name]["result"] = job_result["result"]
-
-    results_q.close()
 
     # sort the results, drop the process name
     return [b for a, b in sorted(result_map.items(), key=first)]
