@@ -24,7 +24,7 @@ logging.basicConfig()
 
 LOG = logging.getLogger(__name__)
 
-HOST = "localhost"
+HOST = "127.0.0.1"
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
@@ -799,49 +799,45 @@ def test_mix_match_ssh_clients4():
     test_check_many_remote_files()  # works
 
 
-# todo: patch process_status and replicate a worker 'hanging'
-
-# todo: check output
 def test_run_script():
-    "a simple bash script can be uploaded and executed and the results accessible"
+    "a simple shell script can be uploaded and executed and the results accessible"
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
             with test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
-                local_script_data = r"""#!/bin/bash
-python -c "for n in range(0,1000):
-    print(n,'foo ' * 80)"
+                open(local_script, "w").write(
+                    r"""#!/bin/bash
+echo "hello, world"
 """
-                open(local_script, "w").write(local_script_data)
+                )
                 remote_script = join(remote_env["temp-dir"], "script.sh")
                 upload(local_script, remote_script)
                 remote("chmod +x %s" % remote_script)
-                remote(
-                    "cd %s && ./script.sh" % (os.path.dirname(remote_script),),
-                    timeout=5,
-                )
+                with rcd(os.path.dirname(remote_script)):
+                    result = remote("./script.sh")
+                assert ["hello, world"] == result["stdout"]
 
 
-# todo: check output, run 'bar' on a second thread
 def test_run_script_parallel():
-    "a simple bash script can be uploaded and executed in parallel, with each of the results accessible"
+    """a simple bash script can be uploaded and executed in parallel across multiple hosts, 
+    with each of the hosts' results accessible"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
             with test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
-                local_script_data = r"""#!/bin/bash
-python -c "for n in range(0,1000):
-    print(n,'foo ' * 80)"
+                open(local_script, "w").write(
+                    r"""#!/bin/bash
+echo "hello, world"
 """
-                open(local_script, "w").write(local_script_data)
+                )
                 remote_script = join(remote_env["temp-dir"], "script.sh")
 
                 @execute.parallel
                 def workerfn():
                     upload(local_script, remote_script)
                     remote("chmod +x %s" % remote_script)
-                    return remote(
-                        "cd %s && ./script.sh" % (os.path.dirname(remote_script),)
-                    )
+                    with rcd(os.path.dirname(remote_script)):
+                        return remote("./script.sh")
 
-                print(execute.execute_with_hosts(workerfn, hosts=["127.0.0.1"]))
+                results = execute.execute_with_hosts(workerfn, hosts=["127.0.0.1"])
+                assert ["hello, world"] == results[HOST]["stdout"]

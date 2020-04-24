@@ -3,6 +3,9 @@ from multiprocessing import Process, Queue
 import time
 from .common import first
 from . import state
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/decorators.py#L148-L161
@@ -116,9 +119,8 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
         return results_q, pool
 
     result_list = [results_q.get(block=True) for _ in range(len(pool))]
-    time.sleep(
-        0.1
-    )  # there is a slight delay between a result appearing and the process exiting
+    # there is a slight delay between a result appearing and the process exiting
+    time.sleep(0.1)
     results_q.close()
 
     result_map = {}  # {process-name: process-results, ...}
@@ -126,15 +128,18 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     # all processes are done, they have yielded results and we can finish up now.
     # there is a case where a worker has yielded results but the process hasn't ended.
     # to solve this we terminate the process and issue a warning.
-    for idx, p in enumerate(pool):
-        status = process_status(p)
+    for idx, process in enumerate(pool):
+        status = process_status(process)
         if status["alive"]:
-            # print("process is still alive despite worker having completed. terminating process: %s" % p)
-            p.terminate()
+            LOG.warning(
+                "process is still alive despite worker having completed. terminating process: %s"
+                % process.name
+            )
+            process.terminate()
             # this should report that the process *was* killed, but the return code should remain the same.
-            status = process_status(p)
+            status = process_status(process)
 
-        result = process_status(p)
+        result = process_status(process)
         result_map[result["name"]] = status
 
     # all processes are complete
