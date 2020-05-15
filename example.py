@@ -41,7 +41,12 @@ It's assumed the dummy sshd server is running and that the host is `localhost`.
 assert (HOST and PORT and USER) and common.isint(PORT), _help_text
 
 test_settings = partial(
-    settings, user=USER, port=int(PORT), host_string=HOST, key_filename=KEY
+    settings,
+    user=USER,
+    port=int(PORT),
+    host_string=HOST,
+    key_filename=KEY,
+    transfer_protocol="scp",
 )
 
 
