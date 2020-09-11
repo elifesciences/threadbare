@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
-<meta name="generator" content="pdoc 0.7.4" />
+<meta name="generator" content="pdoc 0.9.1" />
 <title>threadbare.operations API documentation</title>
 <meta name="description" content="" />
 <link href='/threadbare/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
@@ -24,7 +24,8 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from datetime import datetime
+<pre><code class="python">from functools import wraps
+from datetime import datetime
 import tempfile
 import contextlib
 import subprocess
@@ -33,8 +34,9 @@ import getpass
 from pssh import exceptions as pssh_exceptions
 import os, sys
 from pssh.clients.native import SSHClient as PSSHClient
+import gevent
 import logging
-from . import state
+from . import state, common
 from .common import (
     PromptedException,
     merge,
@@ -44,6 +46,7 @@ from .common import (
     sudo_wrap_command,
     cwd_wrap_command,
     shell_wrap_command,
+    ensure,
 )
 
 
@@ -67,6 +70,11 @@ class NetworkError(BaseException):
         self.wrapped = wrapped_exception_inst
 
     def __str__(self):
+        # for cases where we want the convenient:
+        #   `raise NetworkError(&#34;some network problem&#34;)`
+        if isinstance(self.wrapped, str):
+            return self.wrapped
+
         # we have the opportunity here to tweak the error messages to make them
         # similar to their equivalents in Fabric.
         # original error messages are still available via `str(excinst.wrapped)`
@@ -129,7 +137,7 @@ def handle(base_kwargs, kwargs):
 @contextlib.contextmanager
 def lcd(local_dir):
     &#34;temporarily changes the local working directory&#34;
-    assert os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir
+    ensure(os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir)
     with state.settings():
         current_dir = cwd()
         state.add_cleanup(lambda: os.chdir(current_dir))
@@ -237,6 +245,11 @@ def _print_line(output_pipe, line, **kwargs):
     &#34;&#34;&#34;writes the given `line` (string) to the given `output_pipe` (file-like object)
     if `quiet` is True, `line` is *not* written to `output_pipe`.
     if `discard_output` is True, `line` is not returned and output is not accumulated in memory&#34;&#34;&#34;
+
+    if not common.PY3:
+        # in python2, assume the data we&#39;re reading is utf-8 otherwise the call to `.format`
+        # below will attempt to encode the string as ascii and fail with an `UnicodeEncodeError`
+        line = line.encode(&#34;utf-8&#34;)
 
     base_kwargs = {&#34;discard_output&#34;: False, &#34;quiet&#34;: False, &#34;line_template&#34;: &#34;{line}\n&#34;}
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
@@ -378,7 +391,8 @@ def remote(command, **kwargs):
     )
 
     if final_kwargs[&#34;warn_only&#34;]:
-        LOG.warning(err_msg)
+        if not final_kwargs[&#34;quiet&#34;]:
+            LOG.warning(err_msg)
         return result
 
     abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
@@ -439,6 +453,7 @@ def remote_file_exists(path, **kwargs):
 def local(command, **kwargs):
     &#34;preprocesses given `command` and options before executing it locally using Python&#39;s `subprocess.Popen`&#34;
     base_kwargs = {
+        &#34;use_sudo&#34;: False,
         &#34;use_shell&#34;: True,
         &#34;combine_stderr&#34;: True,
         &#34;capture&#34;: False,
@@ -479,6 +494,13 @@ def local(command, **kwargs):
 
     if final_kwargs[&#34;use_shell&#34;]:
         command = shell_wrap_command(command)
+
+    if final_kwargs[&#34;use_sudo&#34;]:
+        if final_kwargs[&#34;use_shell&#34;]:
+            command = sudo_wrap_command(command)
+        else:
+            # lsh@2020-04: is this good enough? nothing uses local+noshell+sudo
+            command = [&#34;sudo&#34;, &#34;--non-interactive&#34;] + command
 
     proc = subprocess.Popen(
         command, shell=final_kwargs[&#34;use_shell&#34;], stdout=out_stream, stderr=err_stream
@@ -548,6 +570,96 @@ def prompt(msg):
         return input(&#34;&gt; &#34;)
 
 
+#
+# uploads and downloads
+#
+
+
+def _transfer_fn(client, direction, **kwargs):
+    &#34;&#34;&#34;returns the `client` object&#39;s appropriate transfer *method* given a `direction`.
+    `direction` is either &#39;upload&#39; or &#39;download&#39;.
+    Also accepts the `transfer_protocol` keyword parameter that is either &#39;scp&#39; (default) or &#39;sftp&#39;.&#34;&#34;&#34;
+    base_kwargs = {
+        &#34;overwrite&#34;: True,
+        # sftp is *exceptionally* slow so SCP is used by default.
+        # paramiko&#39;s own Python implementation is faster than native SFTP but slower than SCP:
+        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
+        # however, SCP is buggy and may randomly hang or complete without uploading anything.
+        # take slow and reliable over fast and buggy
+        # &#34;transfer_protocol&#34;: &#34;scp&#34;,
+        &#34;transfer_protocol&#34;: &#34;sftp&#34;,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    def upload_fn(fn):
+        @wraps(fn)
+        def wrapper(local_file, remote_file):
+            if remote_file_exists(remote_file) and not final_kwargs[&#34;overwrite&#34;]:
+                raise NetworkError(
+                    &#34;Remote file exists and &#39;overwrite&#39; is set to &#39;False&#39;. Refusing to write: %s&#34;
+                    % (remote_file,)
+                )
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
+            gevent.joinall(fn(local_file, remote_file), raise_error=True)
+
+            # lsh@2020-04, local testing didn&#39;t reveal anything but small files uploaded via SCP SCP during CI
+            # were either missing or had empty bodies. SFTP seemed to be fine.
+            # This sanity check seems to fix the issue (lending more credence to my theory it&#39;s an unflushed buffer somewhere),
+            # when waiting 3 seconds between upload of file and check of file was still failing.
+            ensure(
+                remote_file_exists(remote_file, **kwargs),
+                &#34;failed to upload file, remote file does not exist: %s&#34;
+                % (remote_file,),
+            )
+
+        return wrapper
+
+    def download_fn(fn):
+        @wraps(fn)
+        def wrapper(remote_file, local_file):
+            if not final_kwargs[&#34;overwrite&#34;] and os.path.exists(local_file):
+                raise NetworkError(
+                    &#34;Local file exists and &#39;overwrite&#39; is set to &#39;False&#39;. Refusing to write: %s&#34;
+                    % (local_file,)
+                )
+            # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
+            gevent.joinall(fn(remote_file, local_file), raise_error=True)
+
+        return wrapper
+
+    upload_backends = {
+        # rsync? pigeon?
+        &#34;sftp&#34;: client.copy_file,
+        &#34;scp&#34;: client.scp_send,
+    }
+
+    download_backends = {
+        &#34;sftp&#34;: client.copy_remote_file,
+        &#34;scp&#34;: client.scp_recv,
+    }
+
+    direction_map = {&#34;upload&#34;: upload_backends, &#34;download&#34;: download_backends}
+    ensure(
+        direction in direction_map,
+        &#34;you can &#39;upload&#39; or &#39;download&#39; but not %r&#34; % (direction,),
+    )
+
+    backend_map = direction_map[direction]
+    transfer_protocol = final_kwargs[&#34;transfer_protocol&#34;]
+    ensure(
+        transfer_protocol in backend_map,
+        &#34;unhandled transfer protocol %r; supported protocols: %s&#34;
+        % (transfer_protocol, &#34;, &#34;.join(backend_map.keys())),
+    )
+
+    transfer_fn = direction_map[direction][transfer_protocol]
+
+    direction_wrapper_map = {&#34;upload&#34;: upload_fn, &#34;download&#34;: download_fn}
+    wrapper_fn = direction_wrapper_map[direction]
+
+    return wrapper_fn(transfer_fn)
+
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
 # use_sudo hack: https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L453-L458
 def _download_as_root_hack(remote_path, local_path, **kwargs):
@@ -574,11 +686,20 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
     )
     result = remote_sudo(cmd, **kwargs)
     remote_tempfile = result[&#34;stdout&#34;][-1]
-    # assert remote_file_exists(remote_tempfile, use_sudo=True, **kwargs) # sanity check
     remote_path = remote_tempfile
-    client.copy_remote_file(remote_tempfile, local_path)
-    remote_sudo(&#39;rm &#34;%s&#34;&#39; % remote_tempfile, **kwargs)
-    return local_path
+
+    transfer_fn = _transfer_fn(client, &#34;download&#34;, **kwargs)
+
+    try:
+        transfer_fn(remote_tempfile, local_path)
+        return local_path
+
+    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        # permissions or network issues may cause these
+        raise NetworkError(exc)
+
+    finally:
+        remote_sudo(&#39;rm -f &#34;%s&#34;&#39; % remote_tempfile, **kwargs)
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L419
@@ -587,14 +708,14 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
     &#34;&#34;&#34;downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
     avoid `use_sudo` if at all possible&#34;&#34;&#34;
 
-    # TODO: support an &#39;overwrite?&#39; option?
-
     with state.settings(quiet=True):
         if remote_path.endswith(&#34;/&#34;):
             raise ValueError(&#34;directory downloads are not supported&#34;)
 
-        # do not raise an exception if remote file doesn&#39;t exist
-        result = remote(&#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True)
+        # do not raise an exception if remote path is a directory
+        result = remote(
+            &#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True, quiet=True
+        )
         remote_path_is_dir = result[&#34;succeeded&#34;]
         if remote_path_is_dir:
             raise ValueError(&#34;directory downloads are not supported&#34;)
@@ -624,7 +745,13 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
                     &#34;remote file does not exist: %s&#34; % (remote_path,)
                 )
             client = _ssh_client(**kwargs)
-            client.copy_remote_file(remote_path, local_path)
+            transfer_fn = _transfer_fn(client, &#34;download&#34;, **kwargs)
+
+            try:
+                transfer_fn(remote_path, local_path)
+            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+                # permissions or network issues may cause these
+                raise NetworkError(exc)
 
         if temp_file:
             bytes_buffer.write(open(local_path, &#34;rb&#34;).read())
@@ -649,12 +776,25 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
     )
     result = remote(cmd, **kwargs)
     remote_temp_path = result[&#34;stdout&#34;][-1]
-    assert remote_file_exists(remote_temp_path, **kwargs)  # sanity check
+    ensure(
+        remote_file_exists(remote_temp_path, **kwargs),
+        &#34;remote temporary file %r (%s) does not exist&#34;
+        % (remote_temp_path, remote_path),
+    )
 
-    client.copy_file(local_path, remote_temp_path)
-    move_file_into_place = &#39;mv &#34;%s&#34; &#34;%s&#34;&#39; % (remote_temp_path, remote_path)
-    remote_sudo(move_file_into_place, **kwargs)
-    assert remote_file_exists(remote_path, use_sudo=True, **kwargs)
+    transfer_fn = _transfer_fn(client, &#34;upload&#34;, **kwargs)
+
+    try:
+        transfer_fn(local_path, remote_temp_path)
+        move_file_into_place = &#39;mv &#34;%s&#34; &#34;%s&#34;&#39; % (remote_temp_path, remote_path)
+        remote_sudo(move_file_into_place, **kwargs)
+        ensure(
+            remote_file_exists(remote_path, use_sudo=True, **kwargs),
+            &#34;remote path does not exist: %s&#34; % (remote_path),
+        )
+    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        # permissions or network issues may cause these
+        raise NetworkError(exc)
 
 
 def _write_bytes_to_temporary_file(local_path):
@@ -690,16 +830,14 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
         if not os.path.exists(local_path):
             raise EnvironmentError(&#34;local file does not exist: %s&#34; % (local_path,))
 
-        # you&#39;re not crazy, sftp is *exceptionally* slow:
-        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-        # local(&#39;du -sh %s&#39; % local_path)
-        # client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
         client = _ssh_client(**kwargs)
-        # print(&#39;client&#39;,client)
-        client.copy_file(local_path, remote_path)
-        # client.pool.join()
-        # print(&#39;done&#39;)
-        # client.disconnect()</code></pre>
+
+        try:
+            transfer_fn = _transfer_fn(client, &#34;upload&#34;, **kwargs)
+            transfer_fn(local_path, remote_path)
+        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            # permissions or network issues may cause these
+            raise NetworkError(exc)</code></pre>
 </details>
 </section>
 <section>
@@ -723,14 +861,14 @@ avoid <code>use_sudo</code> if at all possible</p></section>
     &#34;&#34;&#34;downloads file at `remote_path` to `local_path`, overwriting the local path if it exists.
     avoid `use_sudo` if at all possible&#34;&#34;&#34;
 
-    # TODO: support an &#39;overwrite?&#39; option?
-
     with state.settings(quiet=True):
         if remote_path.endswith(&#34;/&#34;):
             raise ValueError(&#34;directory downloads are not supported&#34;)
 
-        # do not raise an exception if remote file doesn&#39;t exist
-        result = remote(&#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True)
+        # do not raise an exception if remote path is a directory
+        result = remote(
+            &#39;test -d &#34;%s&#34;&#39; % remote_path, use_sudo=use_sudo, warn_only=True, quiet=True
+        )
         remote_path_is_dir = result[&#34;succeeded&#34;]
         if remote_path_is_dir:
             raise ValueError(&#34;directory downloads are not supported&#34;)
@@ -760,7 +898,13 @@ avoid <code>use_sudo</code> if at all possible</p></section>
                     &#34;remote file does not exist: %s&#34; % (remote_path,)
                 )
             client = _ssh_client(**kwargs)
-            client.copy_remote_file(remote_path, local_path)
+            transfer_fn = _transfer_fn(client, &#34;download&#34;, **kwargs)
+
+            try:
+                transfer_fn(remote_path, local_path)
+            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+                # permissions or network issues may cause these
+                raise NetworkError(exc)
 
         if temp_file:
             bytes_buffer.write(open(local_path, &#34;rb&#34;).read())
@@ -839,7 +983,7 @@ def hide(what=None):
 <pre><code class="python">@contextlib.contextmanager
 def lcd(local_dir):
     &#34;temporarily changes the local working directory&#34;
-    assert os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir
+    ensure(os.path.isdir(local_dir), &#34;not a directory: %s&#34; % local_dir)
     with state.settings():
         current_dir = cwd()
         state.add_cleanup(lambda: os.chdir(current_dir))
@@ -859,6 +1003,7 @@ def lcd(local_dir):
 <pre><code class="python">def local(command, **kwargs):
     &#34;preprocesses given `command` and options before executing it locally using Python&#39;s `subprocess.Popen`&#34;
     base_kwargs = {
+        &#34;use_sudo&#34;: False,
         &#34;use_shell&#34;: True,
         &#34;combine_stderr&#34;: True,
         &#34;capture&#34;: False,
@@ -899,6 +1044,13 @@ def lcd(local_dir):
 
     if final_kwargs[&#34;use_shell&#34;]:
         command = shell_wrap_command(command)
+
+    if final_kwargs[&#34;use_sudo&#34;]:
+        if final_kwargs[&#34;use_shell&#34;]:
+            command = sudo_wrap_command(command)
+        else:
+            # lsh@2020-04: is this good enough? nothing uses local+noshell+sudo
+            command = [&#34;sudo&#34;, &#34;--non-interactive&#34;] + command
 
     proc = subprocess.Popen(
         command, shell=final_kwargs[&#34;use_shell&#34;], stdout=out_stream, stderr=err_stream
@@ -1117,7 +1269,8 @@ def rcd(remote_working_dir):
     )
 
     if final_kwargs[&#34;warn_only&#34;]:
-        LOG.warning(err_msg)
+        if not final_kwargs[&#34;quiet&#34;]:
+            LOG.warning(err_msg)
         return result
 
     abort_exc_klass = final_kwargs[&#34;abort_exception&#34;]
@@ -1177,7 +1330,7 @@ def rcd(remote_working_dir):
 <span>def <span class="ident">remote_sudo</span></span>(<span>command, **kwargs)</span>
 </code></dt>
 <dd>
-<section class="desc"><p>exactly the same as <a title="threadbare.operations.remote" href="#threadbare.operations.remote"><code>remote()</code></a>, but the given command is run as the root user</p></section>
+<section class="desc"><p>exactly the same as <code><a title="threadbare.operations.remote" href="#threadbare.operations.remote">remote()</a></code>, but the given command is run as the root user</p></section>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1234,13 +1387,14 @@ def rcd(remote_working_dir):
         if not os.path.exists(local_path):
             raise EnvironmentError(&#34;local file does not exist: %s&#34; % (local_path,))
 
-        # you&#39;re not crazy, sftp is *exceptionally* slow:
-        # - https://github.com/ParallelSSH/parallel-ssh/issues/177
-        # local(&#39;du -sh %s&#39; % local_path)
-        # client = _ssh_client(timeout=5, keepalive_seconds=1, num_retries=1, **kwargs)
         client = _ssh_client(**kwargs)
-        # print(&#39;client&#39;,client)
-        client.copy_file(local_path, remote_path)</code></pre>
+
+        try:
+            transfer_fn = _transfer_fn(client, &#34;upload&#34;, **kwargs)
+            transfer_fn(local_path, remote_path)
+        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            # permissions or network issues may cause these
+            raise NetworkError(exc)</code></pre>
 </details>
 </dd>
 </dl>
@@ -1269,6 +1423,11 @@ wrapped exception.</p></section>
         self.wrapped = wrapped_exception_inst
 
     def __str__(self):
+        # for cases where we want the convenient:
+        #   `raise NetworkError(&#34;some network problem&#34;)`
+        if isinstance(self.wrapped, str):
+            return self.wrapped
+
         # we have the opportunity here to tweak the error messages to make them
         # similar to their equivalents in Fabric.
         # original error messages are still available via `str(excinst.wrapped)`
@@ -1395,7 +1554,7 @@ provided private key.</p></section>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.1</a>.</p>
 </footer>
 <script src="/threadbare/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 <script>hljs.initHighlightingOnLoad()</script>
