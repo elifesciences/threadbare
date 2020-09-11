@@ -317,8 +317,8 @@ def test_run_many_remote_commands_singly():
 
 
 def test_run_many_remote_commands_serially():
-    """run a list of `remote` commands serially. The `execute` module is aimed at 
-    running commands in parallel. 
+    """run a list of `remote` commands serially. The `execute` module is aimed at
+    running commands in parallel.
     Serial execution exists only as a sensible default and offers nothing extra."""
     command_list = [
         "echo all",
@@ -337,7 +337,7 @@ def test_run_many_remote_commands_serially():
 
 
 def test_run_many_remote_commands_in_parallel():
-    """run a list of `remote` commands in parallel. 
+    """run a list of `remote` commands in parallel.
     `remote` commands run in parallel do not share a ssh connection.
     the order of results can be guaranteed but not the order in which output is emitted"""
     command_list = [
@@ -386,7 +386,7 @@ def test_check_remote_files():
 
 
 def test_upload_and_download_a_file():
-    """write a local file, upload it to the remote server, modify it remotely, download it, modify it locally, 
+    """write a local file, upload it to the remote server, modify it remotely, download it, modify it locally,
     assert it's contents are as expected"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
@@ -676,7 +676,7 @@ def test_upload_file_to_root_dir_using_sftp():
 
 
 def test_upload_and_download_a_file_using_byte_buffers():
-    """contents of a BytesIO buffer can be uploaded to a remote file, 
+    """contents of a BytesIO buffer can be uploaded to a remote file,
     and the contents of a remote file can be downloaded to a BytesIO buffer"""
     with empty_remote_fixture() as remote_env:
         with test_settings(quiet=True):
@@ -743,7 +743,10 @@ def test_line_formatting():
             "failed": False,
             "return_code": 0,
             "stderr": [],
-            "stdout": ["I am 1, iteration 1", "I am 1, iteration 2",],
+            "stdout": [
+                "I am 1, iteration 1",
+                "I am 1, iteration 2",
+            ],
             "succeeded": True,
         },
         {
@@ -824,7 +827,7 @@ echo "hello, world"
 
 
 def test_run_script_parallel():
-    """a simple bash script can be uploaded and executed in parallel across multiple hosts, 
+    """a simple bash script can be uploaded and executed in parallel across multiple hosts,
     with each of the hosts' results accessible"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:

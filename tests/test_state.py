@@ -73,7 +73,7 @@ def test_uncontrolled_global_state_modification():
 
 @reset
 def test_uncontrolled_global_state_modification_2():
-    """modifications to global state that happen outside of the context manager's 
+    """modifications to global state that happen outside of the context manager's
     control (with ... as ...) are available as expected BUT are reverted on exit"""
     assert isinstance(state.ENV, state.FreezeableDict)
     assert state.ENV == {}
