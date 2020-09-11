@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
-<meta name="generator" content="pdoc 0.7.4" />
+<meta name="generator" content="pdoc 0.9.1" />
 <title>threadbare API documentation</title>
 <meta name="description" content="Threadbare …" />
 <link href='/threadbare/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
@@ -21,7 +21,12 @@
 </header>
 <section id="section-intro">
 <h1 id="threadbare">Threadbare</h1>
-<p>A partial replacement for the slice of Fabric 1.x and Paramiko used in <a href="https://github.com/elifesciences/builder">Builder</a></p>
+<p>A partial replacement for the slice of Fabric 1.x and Paramiko used in
+<a href="https://github.com/elifesciences/builder">elifesciences/builder</a>.</p>
+<p><a href="https://elifesciences.github.io/threadbare">Documentation</a>.</p>
+<h2 id="installation">installation</h2>
+<pre><code>pip install threadbare
+</code></pre>
 <h2 id="usage">usage</h2>
 <p>Threadbare can be used like this:</p>
 <pre><code class="python">import threadbare
@@ -58,9 +63,9 @@ insecure ssh configuration. Be cautious.</p>
 <h1 id="a-guide-to-threadbare-for-developers">a guide to Threadbare for developers</h1>
 <p>Threadbare is comprised of just three modules:</p>
 <ol>
-<li><a title="threadbare.state" href="state.html"><code>threadbare.state</code></a></li>
-<li><a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a></li>
-<li><a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a></li>
+<li><code><a title="threadbare.state" href="state.html">threadbare.state</a></code></li>
+<li><code><a title="threadbare.operations" href="operations.html">threadbare.operations</a></code></li>
+<li><code><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code></li>
 </ol>
 <h2 id="state">state</h2>
 <p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/state.py">source</a>)</p>
@@ -69,33 +74,33 @@ insecure ssh configuration. Be cautious.</p>
 <p>It has many defaults and functions will dip into the environment dictionary and pull out settings as they need them.</p>
 <p>Global state can be built up by nesting context managers like <code>settings</code> or <code>hide</code> or <code>lcd</code>, pushing new state into the
 environment dictionary, and then popping it off as execution leaves the context manager.</p>
-<p>The <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module replicates this mechanism but with no initial defaults. Default values are pushed back into the
+<p>The <code><a title="threadbare.state" href="state.html">threadbare.state</a></code> module replicates this mechanism but with no initial defaults. Default values are pushed back into the
 functions and may be overridden globally in a general way or overridden specifically by passing in a keyword argument to
 the function.</p>
 <p>This change:</p>
 <ul>
 <li>improves locality of reference. All options that a function operates on are defined right there with the function.</li>
-<li>keeps the <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module small and dumb and predictable</li>
+<li>keeps the <code><a title="threadbare.state" href="state.html">threadbare.state</a></code> module small and dumb and predictable</li>
 </ul>
 <h2 id="operations">operations</h2>
 <p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/operations.py">source</a>)</p>
 <p>Fabric provides a set of very useful commands, like <code>local</code> or <code>sudo</code> or <code>cd</code>.</p>
-<p>The <a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a> module re-implements these commands and they make heavy use of the <a title="threadbare.state" href="state.html"><code>threadbare.state</code></a> module.</p>
+<p>The <code><a title="threadbare.operations" href="operations.html">threadbare.operations</a></code> module re-implements these commands and they make heavy use of the <code><a title="threadbare.state" href="state.html">threadbare.state</a></code> module.</p>
 <p>Not all commands have been re-implemented, just those in use by Builder.</p>
-<p>A big part of the <a title="threadbare.operations" href="operations.html"><code>threadbare.operations</code></a> module is running commands on a remote host. Where Fabric uses it's sister project
+<p>A big part of the <code><a title="threadbare.operations" href="operations.html">threadbare.operations</a></code> module is running commands on a remote host. Where Fabric uses it's sister project
 Paramiko, Threadbare uses a library called PSSH, or ParallelSSH. ParallelSSH itself wraps another project of theirs
 called <code>ssh-python</code>, an interface between <code>libssh</code> and Python. ParallelSSH does a little more than just wrap
 <code>ssh-python</code>, it also provides a higher level (and more convenient) interface to basic network operations and ensures
 thread safety.</p>
-<p>Threadbare does <em>not</em> use the parallel capabilities of ParallelSSH. See <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a>.</p>
+<p>Threadbare does <em>not</em> use the parallel capabilities of ParallelSSH. See <code><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code>.</p>
 <h2 id="execute">execute</h2>
 <p>(<a href="https://github.com/elifesciences/threadbare/blob/develop/threadbare/execute.py">source</a>)</p>
 <p>Fabric provides an interface for running commands in parallel using their global state manipulation mechanism and set of
 operations. It uses Python's <code>multiprocessing</code> module.</p>
-<p>Threadbare re-implements this mechanism in <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a>, also using <code>multiprocessing</code>.</p>
+<p>Threadbare re-implements this mechanism in <code><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code>, also using <code>multiprocessing</code>.</p>
 <p>In Fabric the parallelism is used primarily to execute commands on multiple hosts simultaneously, so the interfaces are
 skewed towards that. Threadbare is more general purpose but provides the function <code>execute_with_hosts</code> that behaves as
-Fabric's <a title="threadbare.execute" href="execute.html"><code>threadbare.execute</code></a> does.</p>
+Fabric's <code><a title="threadbare.execute" href="execute.html">threadbare.execute</a></code> does.</p>
 <p>Both Threadbare and Fabric share the same caveats of running code in different processes using <code>multiprocessing</code> with a
 mechanism for manipulating global state. </p>
 <ul>
@@ -109,6 +114,7 @@ mechanism for manipulating global state. </p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">import os
+
 if os.path.exists(&#34;README.md&#34;):
     data = open(&#34;README.md&#34;).read()
     __doc__ = str(data)
@@ -118,6 +124,7 @@ if os.path.exists(&#34;README.md&#34;):
 # this bit of magic appears to make everything work nicely with each other.
 # - http://www.gevent.org/api/gevent.monkey.html
 from gevent import monkey
+
 monkey.patch_all()
 
 
@@ -166,6 +173,7 @@ for unwanted_logger in disable_these_handlers:
 <div class="toc">
 <ul>
 <li><a href="#threadbare">Threadbare</a><ul>
+<li><a href="#installation">installation</a></li>
 <li><a href="#usage">usage</a></li>
 <li><a href="#local-tests">local tests</a></li>
 <li><a href="#remote-tests">remote tests</a></li>
@@ -193,7 +201,7 @@ for unwanted_logger in disable_these_handlers:
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.7.4</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.1</a>.</p>
 </footer>
 <script src="/threadbare/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 <script>hljs.initHighlightingOnLoad()</script>

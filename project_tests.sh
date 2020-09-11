@@ -8,7 +8,7 @@ echo "(destroying any venv)"
 rm -rf venv/
 
 # creates a venv and test dependencies
-. install.sh
+. install.sh -dev
 
 ./tests-remote/sshd-server.sh &
 pid=$!

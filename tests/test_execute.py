@@ -1,7 +1,11 @@
 import pytest
 import time
 import logging
-from unittest.mock import patch
+
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch
 from threadbare import execute, operations
 from threadbare.state import settings
 from threadbare.common import PromptedException
@@ -298,7 +302,7 @@ def test_parallel_with_prompts_custom():
 
 
 def test_execute_with_prompts_override():
-    """prompts issued while executing a worker function in parallel that has set 
+    """prompts issued while executing a worker function in parallel that has set
     their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised"""
 
     @execute.parallel
@@ -315,9 +319,9 @@ def test_execute_with_prompts_override():
 
 
 def test_execute_process_not_terminating(caplog):
-    """we've had a case where a parallel process doesn't terminate despite the 
+    """we've had a case where a parallel process doesn't terminate despite the
     worker function having finished and returned a result.
-    This test simulates that scenario (because I can't replicate it under test conditions) 
+    This test simulates that scenario (because I can't replicate it under test conditions)
     by patching `process_status` to always return `alive=True`"""
 
     # keep a reference before mock.patch overrides it
