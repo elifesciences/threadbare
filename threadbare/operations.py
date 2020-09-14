@@ -548,6 +548,55 @@ def prompt(msg):
 # uploads and downloads
 #
 
+def _rsync_upload(local_path, remote_path, **kwargs):
+    base_kwargs = {
+        "user": getpass.getuser(),
+        "host_string": None,
+        "key_filename": os.path.expanduser("~/.ssh/id_rsa"),
+        "port": 22,
+        "quiet": False,
+        "warn_only": False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    
+    remote_path = remote_path.lstrip('/')
+    
+    cmd = [
+        "rsync",
+        # '-i' is 'identity file'
+        "--rsh='ssh -i %s -p %s'" % (final_kwargs['key_filename'], final_kwargs['port']),
+        local_path,
+        "%s@%s:/%s" % (final_kwargs['user'], final_kwargs['host_string'], remote_path)
+    ]
+    return cmd
+
+def rsync_upload(local_path, remote_path, **kwargs):
+    return local(_rsync_upload(local_path, remote_path, kwargs))
+
+def _rsync_download(remote_path, local_path, **kwargs):
+    base_kwargs = {
+        "user": getpass.getuser(),
+        "host_string": None,
+        "key_filename": os.path.expanduser("~/.ssh/id_rsa"),
+        "port": 22,
+        "quiet": False,
+        "warn_only": False,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    
+    remote_path = remote_path.lstrip('/')
+    
+    cmd = [
+        "rsync",
+        # '-i' is 'identity file'
+        "--rsh='ssh -i %s -p %s'" % (final_kwargs['key_filename'], final_kwargs['port']),
+        "%s@%s:/%s" % (final_kwargs['user'], final_kwargs['host_string'], remote_path),
+        local_path
+    ]
+    return cmd
+
+def rsync_download(remote_path, local_path, **kwargs):
+    return local(_rsync_download(remote_path, local_path, **kwargs))
 
 def _transfer_fn(client, direction, **kwargs):
     """returns the `client` object's appropriate transfer *method* given a `direction`.
@@ -601,14 +650,15 @@ def _transfer_fn(client, direction, **kwargs):
         return wrapper
 
     upload_backends = {
-        # rsync? pigeon?
         "sftp": client.copy_file,
         "scp": client.scp_send,
+        "rsync": rsync_upload,
     }
 
     download_backends = {
         "sftp": client.copy_remote_file,
         "scp": client.scp_recv,
+        "rsync": rsync_download,
     }
 
     direction_map = {"upload": upload_backends, "download": download_backends}
