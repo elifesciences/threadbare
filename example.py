@@ -28,13 +28,16 @@ HOST = "127.0.0.1"
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
+TRANSFER_PROTOCOL = os.environ.get("THREADBARE_TEST_PROTOCOL", "scp")
 
 _help_text = """the environment variables below must be defined before executing this script:
 THREADBARE_TEST_PORT=
 THREADBARE_TEST_USER=
 THREADBARE_TEST_PUBKEY=
+THREADBARE_TEST_PROTOCOL=
 
 THREADBARE_TEST_PORT must be an integer.
+THREADBARE_TEST_PROTOCOL will default to 'scp' if not set
 
 It's assumed the dummy sshd server is running and that the host is `localhost`.
 """
@@ -46,7 +49,7 @@ test_settings = partial(
     port=int(PORT),
     host_string=HOST,
     key_filename=KEY,
-    transfer_protocol="scp",
+    transfer_protocol=TRANSFER_PROTOCOL,
 )
 
 
@@ -385,12 +388,12 @@ def test_check_remote_files():
             assert not remote_file_exists(file_that_does_not_exist)
 
 
-def test_upload_and_download_a_file():
+def _test_upload_and_download_a_file(transfer_protocol):
     """write a local file, upload it to the remote server, modify it remotely, download it, modify it locally,
     assert it's contents are as expected"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with test_settings(transfer_protocol=transfer_protocol):
                 LOG.debug("modifying local file ...")
                 local_file_name = join(local_env["temp-dir"], "foo")
                 local('printf "foo" > %s' % local_file_name)
@@ -422,10 +425,12 @@ def test_upload_and_download_a_file():
                 assert "foobarbaz" == data
 
 
-def test_upload_and_download_a_file_using_sftp():
-    "same as `test_upload_and_download_a_file`, but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        return test_upload_and_download_a_file()
+def test_upload_and_download_a_file_coverage_bump():
+    """tests uploading and downloading a file using all three transfer protocols.
+    this is covered more thoroughly in the `./project-tests.sh` script, this is just
+    to bump test coverage."""
+    for transfer_protocol in ["scp", "sftp", "rsync"]:
+        _test_upload_and_download_a_file(transfer_protocol)
 
 
 def test_upload_a_directory():  # you can't
@@ -435,12 +440,6 @@ def test_upload_a_directory():  # you can't
             with test_settings():
                 with pytest.raises(ValueError):
                     upload(local_env["temp-dir"], remote_env["temp-dir"])
-
-
-def test_upload_a_directory_using_sftp():  # you still can't
-    "same as `test_upload_a_directory` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_upload_a_directory()
 
 
 def test_upload_to_extant_remote_file():
@@ -456,12 +455,6 @@ def test_upload_to_extant_remote_file():
                 upload(BytesIO(payload), remote_file)
                 result = remote('cat "%s"' % (remote_file,))
                 assert [payload.decode("utf-8")] == result["stdout"]
-
-
-def test_upload_to_extant_remote_file_using_sftp():
-    "same as `test_upload_to_extant_remote_file` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_upload_to_extant_remote_file()
 
 
 def test_upload_to_extant_remote_file_no_overwrite():
@@ -482,12 +475,6 @@ def test_upload_to_extant_remote_file_no_overwrite():
                 assert expected_msg == str(exc_info.value)
 
 
-def test_upload_to_extant_remote_file_no_overwrite_using_sftp():
-    "same as `test_upload_to_extant_remote_file_no_overwrite` but using SFTP to transfer files."
-    with settings(transfer_protocol="sftp"):
-        test_upload_to_extant_remote_file_no_overwrite()
-
-
 def test_download_to_extant_local_file():
     "the default policy is to overwrite files that exist."
     with local_fixture() as local_env:
@@ -504,12 +491,6 @@ def test_download_to_extant_local_file():
                 download(remote_file, local_file)
                 result = open(local_file, "r").read()
                 assert payload == result
-
-
-def test_download_to_extant_local_file_using_sftp():
-    "same as `test_download_to_extant_local_file` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_download_to_extant_local_file()
 
 
 def test_download_to_extant_local_file_no_overwrite():
@@ -530,12 +511,6 @@ def test_download_to_extant_local_file_no_overwrite():
                 assert expected_msg == str(exc_info.value)
 
 
-def test_download_to_extant_local_file_no_overwrite_using_sftp():
-    "same as `test_download_to_extant_local_file_no_overwrite` but using SFTP to transfer files."
-    with settings(transfer_protocol="sftp"):
-        test_download_to_extant_local_file_no_overwrite()
-
-
 def test_download_a_directory():  # you can't
     "attempting to download a directory raises an exception."
     # its possible as both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
@@ -549,12 +524,6 @@ def test_download_a_directory():  # you can't
                     download(remote_dir, local_env["temp-dir"])
 
 
-def test_download_a_directory_using_sftp():  # you still can't
-    "same as `test_download_a_directory` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_download_a_directory()
-
-
 def test_download_an_obvious_directory():  # you can't
     """attempting to download an obvious directory (trailing slash /) raises an exception.
     Its possible as both parallel-ssh and paramiko use SFTP, but not supported."""
@@ -565,12 +534,6 @@ def test_download_an_obvious_directory():  # you can't
                 remote_dir = "%s/" % remote_env["temp-dir"].rstrip("/")
                 with pytest.raises(ValueError):
                     download(remote_dir, local_env["temp-dir"])
-
-
-def test_download_an_obvious_directory_using_sftp():  # you still can't
-    "same as `test_download_an_obvious_directory` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_download_an_obvious_directory()
 
 
 def test_download_a_file_to_a_directory():
@@ -587,12 +550,6 @@ def test_download_a_file_to_a_directory():
                 assert expected_local_file == new_local_file
 
 
-def test_download_a_file_to_a_directory_using_sftp():
-    "same as `test_download_a_file_to_a_directory` but using SFTP"
-    with settings(transfer_protocol="sftp"):
-        test_download_a_file_to_a_directory()
-
-
 def test_download_a_file_to_a_relative_directory():
     "relative destinations are expanded to full paths before downloading"
     with remote_fixture() as remote_env:
@@ -607,12 +564,6 @@ def test_download_a_file_to_a_relative_directory():
                     new_local_file = download(remote_file, ".")
                     assert expected_local_file == new_local_file
                     assert os.path.exists(expected_local_file)
-
-
-def test_download_a_file_to_a_relative_directory_using_sftp():
-    "same as `test_download_a_file_to_a_relative_directory` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_download_a_file_to_a_relative_directory()
 
 
 def test_download_file_owned_by_root():
@@ -642,12 +593,6 @@ def test_download_file_owned_by_root():
                 assert file_contents == open(local_file_name, "r").read()
 
 
-def test_download_file_owned_by_root_using_sftp():
-    "same as `test_download_file_owned_by_root` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        test_download_file_owned_by_root()
-
-
 def test_upload_file_to_root_dir():
     "uploads a file as a regular user to a root-owned directory with `use_sudo`"
     with local_fixture() as local_env:
@@ -666,13 +611,6 @@ def test_upload_file_to_root_dir():
 
                 upload(local_file_name, remote_file_name, use_sudo=True)
                 assert remote_file_exists(remote_file_name, use_sudo=True)
-
-
-def test_upload_file_to_root_dir_using_sftp():
-    "same as `test_upload_file_to_root_dir` but using SFTP to transfer files"
-    with settings(transfer_protocol="sftp"):
-        LOG.debug("(this is *very* slow over SFTP)")
-        test_upload_file_to_root_dir()
 
 
 def test_upload_and_download_a_file_using_byte_buffers():
