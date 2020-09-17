@@ -594,26 +594,28 @@ def test_formatted_output_unicode():
 
 
 def test_rsync_upload_command():
-    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' /local/foo elife@34.234.82.201:/remote/bar"
-    with state.settings(
-        user="elife",
-        port=23,
-        host_string="34.234.82.201",
-        key_filename="/example/path/id_rsa",
-    ):
-        assert expected == " ".join(
-            operations._rsync_upload("/local/foo", "/remote/bar")
-        )
+    "rsync invocations are generated correctly"
+    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' /local/foo elife@1.2.3.4:/remote/bar"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "1.2.3.4",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_upload("/local/foo", "/remote/bar")
+        assert expected == actual
 
 
 def test_rsync_download_command():
-    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' elife@34.234.82.201:/remote/bar /local/foo"
-    with state.settings(
-        user="elife",
-        port=23,
-        host_string="34.234.82.201",
-        key_filename="/example/path/id_rsa",
-    ):
-        assert expected == " ".join(
-            operations._rsync_download("/remote/bar", "/local/foo")
-        )
+    "rsync invocations are generated correctly"
+    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' elife@1.2.3.4:/remote/bar /local/foo"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "1.2.3.4",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_download("/remote/bar", "/local/foo")
+        assert expected == actual

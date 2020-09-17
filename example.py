@@ -28,16 +28,17 @@ HOST = "127.0.0.1"
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
-TRANSFER_PROTOCOL = os.environ.get("THREADBARE_TEST_TRANSFER_PROTOCOL", "scp")
+TRANSFER_PROTOCOL = os.environ.get("THREADBARE_TEST_TRANSFER_PROTOCOL")
 
 _help_text = """the environment variables below must be defined before executing this script:
 THREADBARE_TEST_PORT=
 THREADBARE_TEST_USER=
 THREADBARE_TEST_PUBKEY=
 THREADBARE_TEST_PROTOCOL=
+THREADBARE_TEST_TRANSFER_PROTOCOL=
 
 THREADBARE_TEST_PORT must be an integer.
-THREADBARE_TEST_TRANSFER_PROTOCOL will default to 'scp' if not set
+THREADBARE_TEST_TRANSFER_PROTOCOL must be either 'scp', 'sftp' or 'rsync'
 
 It's assumed the dummy sshd server is running and that the host is `localhost`.
 """
@@ -427,8 +428,8 @@ def _test_upload_and_download_a_file(transfer_protocol):
 
 def test_upload_and_download_a_file_coverage_bump():
     """tests uploading and downloading a file using all three transfer protocols.
-    this is covered more thoroughly in the `./project-tests.sh` script, this is just
-    to bump test coverage."""
+    this is covered more thoroughly in the `./project-tests.sh` script and is
+    just to bump test coverage."""
     for transfer_protocol in ["scp", "sftp", "rsync"]:
         _test_upload_and_download_a_file(transfer_protocol)
 
@@ -458,7 +459,7 @@ def test_upload_to_extant_remote_file():
 
 
 def test_upload_to_extant_remote_file_no_overwrite():
-    "The default policy of overwriting files can be disabled when `override` is set to `False`."
+    "the default policy of overwriting files can be disabled when `override` is set to `False`."
     with empty_local_fixture():
         with remote_fixture() as remote_env:
             with test_settings():
@@ -476,7 +477,7 @@ def test_upload_to_extant_remote_file_no_overwrite():
 
 
 def test_upload_to_non_existant_remote_dir():
-    ""
+    "intermediate non-existant directories in a remote path will be created."
     with local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
             with test_settings():
