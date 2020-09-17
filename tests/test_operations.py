@@ -591,3 +591,31 @@ def test_formatted_output_unicode():
     with state.settings(line_template=line_template):
         result = operations._print_line(StringIO(), unicode_point)
         assert expected_stdout == result
+
+
+def test_rsync_upload_command():
+    "rsync invocations are generated correctly"
+    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' /local/foo elife@1.2.3.4:/remote/bar"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "1.2.3.4",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_upload("/local/foo", "/remote/bar")
+        assert expected == actual
+
+
+def test_rsync_download_command():
+    "rsync invocations are generated correctly"
+    expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' elife@1.2.3.4:/remote/bar /local/foo"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "1.2.3.4",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_download("/remote/bar", "/local/foo")
+        assert expected == actual
