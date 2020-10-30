@@ -26,3 +26,6 @@ if [ ! -e "venv/bin/$python" ]; then
 else
     echo "using $python"
 fi
+
+source venv/bin/activate
+pip install wheel pip --upgrade
