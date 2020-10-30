@@ -8,17 +8,19 @@ rm -rf venv/
 # whatever your preferred version of python is, eLife needs to support python3.6 (Ubuntu 18.04)
 python3.6 -m venv venv
 
-export VIRTUAL_ENV="venv"
+# prefer using wheels to compilation
+source venv/bin/activate
+pip install wheel 
 
 # updates the Pipfile.lock file and then installs the newly updated dependencies.
 # the envvar is necessary otherwise pipenv will use it's own .venv directory.
-pipenv update
+VIRTUAL_ENV="venv" pipenv update
 
 datestamp=$(date -I)
 echo "# file generated $datestamp - see update-dependencies.sh" > requirements.txt
-pipenv run pip freeze >> requirements.txt
+VIRTUAL_ENV="venv" pipenv run pip freeze >> requirements.txt
 
 # now do the dev requirements
-pipenv sync --dev
+VIRTUAL_ENV="venv" pipenv sync --dev
 echo "# file generated $datestamp - see update-dependencies.sh" > requirements-dev.txt
-pipenv run pip freeze >> requirements-dev.txt
+VIRTUAL_ENV="venv" pipenv run pip freeze >> requirements-dev.txt
