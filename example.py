@@ -361,8 +361,8 @@ def test_run_many_remote_commands_in_parallel():
         assert results[-2]["stdout"] == ["are executed"]
 
 
-def test_remote_exceptions_in_parallel():
-    """Remote commands that raise exceptions while executing in parallel return the exception object."""
+def test_remote_exceptions_in_parallel__raise_errors():
+    """Remote commands that raise exceptions while executing in parallel are re-raised when encountered in the results."""
 
     def workerfn():
         with state.settings():
@@ -374,7 +374,25 @@ def test_remote_exceptions_in_parallel():
         expected = RuntimeError(
             "remote() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
         )
-        result_list = execute.execute(workerfn)
+        with pytest.raises(RuntimeError) as e:
+            execute.execute(workerfn)
+            assert str(expected) == str(e)
+
+
+def test_remote_exceptions_in_parallel__swallow_errors():
+    """Remote commands that raise exceptions while executing in parallel return the exception object when `raise_unhandled_errors` is `False`."""
+
+    def workerfn():
+        with state.settings():
+            return remote("exit 1")
+
+    workerfn = execute.parallel(workerfn, pool_size=1)
+
+    with test_settings():
+        expected = RuntimeError(
+            "remote() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
+        )
+        result_list = execute.execute(workerfn, raise_unhandled_errors=False)
         result = result_list[0]
         assert str(expected) == str(result)
 
