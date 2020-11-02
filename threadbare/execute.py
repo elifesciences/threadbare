@@ -180,7 +180,9 @@ def execute(func, param_key=None, param_values=None, raise_unhandled_errors=True
     `param` and `param_list` are optional, but if one is specified then so must the other.
 
     parent process blocks until all child processes have completed.
-    returns a map of execution data with the return values of the individual executions available under 'result'"""
+    returns a map of execution data with the return values of the individual executions available under 'result'.
+
+    when `raise_unhandled_errors` is `True` (default), the first result that is an exception will be re-raised."""
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is
     # correct before passing it to `_execute` that does the actual magic.
