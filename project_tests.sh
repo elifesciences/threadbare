@@ -5,10 +5,10 @@
 set -e
 
 echo "(destroying any venv)"
-rm -rf venv/
+#rm -rf venv/
 
 # creates a venv and test dependencies
-. install.sh -dev
+#. install.sh -dev
 
 ./tests-remote/sshd-server.sh &
 sleep 1 # it's possible to hit pytest before sshd-server has finished

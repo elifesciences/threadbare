@@ -249,15 +249,29 @@ def test_parallel_terminate():
     assert results_q.empty()
 
 
-def test_parallel_worker_exceptions():
-    "exceptions in worker functions are returned as results"
+def test_parallel_worker_exceptions__raise_errors():
+    "exceptions in worker functions are raised when encountered in the results"
     exc_msg = "omg. dead"
 
     @execute.parallel
     def workerfn():
         raise EnvironmentError(exc_msg)
 
-    results = execute.execute(workerfn)
+    with pytest.raises(EnvironmentError) as e:
+        execute.execute(workerfn)
+        assert isinstance(e, EnvironmentError)
+        assert str(e) == exc_msg
+
+
+def test_parallel_worker_exceptions__swallow_errors():
+    "exceptions in worker functions are returned as results when `raise_unhandled_errors` is `False`"
+    exc_msg = "omg. dead"
+
+    @execute.parallel
+    def workerfn():
+        raise EnvironmentError(exc_msg)
+
+    results = execute.execute(workerfn, raise_unhandled_errors=False)
     unhandled_exception = results[0]
     assert isinstance(unhandled_exception, EnvironmentError)
     assert str(unhandled_exception) == exc_msg
@@ -276,19 +290,32 @@ def test_execute_with_hosts():
     assert expected == results
 
 
-def test_parallel_with_prompts():
+def test_parallel_with_prompts__raise_errors():
     "prompts issued while executing a worker function in parallel return the PromptedException"
 
     @execute.parallel
     def workerfn():
         return operations.prompt("gimmie")
 
-    results = execute.execute(workerfn)
+    with pytest.raises(PromptedException) as e:
+        execute.execute(workerfn)
+        expected = "prompted with: gimmie"
+        assert expected == str(e)
+
+
+def test_parallel_with_prompts__swallow_errors():
+    "prompts issued while executing a worker function in parallel return the PromptedException"
+
+    @execute.parallel
+    def workerfn():
+        return operations.prompt("gimmie")
+
+    results = execute.execute(workerfn, raise_unhandled_errors=False)
     expected = str(PromptedException("prompted with: gimmie"))
     assert expected == str(results[0])
 
 
-def test_parallel_with_prompts_custom():
+def test_parallel_with_prompts_custom__raise_errors():
     "prompts issued while executing a worker function in parallel with `abort_exception` return a custom exception"
 
     @execute.parallel
@@ -296,26 +323,54 @@ def test_parallel_with_prompts_custom():
         return operations.prompt("gimmie")
 
     with settings(abort_exception=ValueError):
-        results = execute.execute(workerfn)
+        with pytest.raises(ValueError) as e:
+            execute.execute(workerfn)
+            expected = "prompted with: gimmie"
+            assert expected == str(e)
+
+
+def test_parallel_with_prompts_custom__swallow_errors():
+    "prompts issued while executing a worker function in parallel with `abort_exception` return a custom exception"
+
+    @execute.parallel
+    def workerfn():
+        return operations.prompt("gimmie")
+
+    with settings(abort_exception=ValueError):
+        results = execute.execute(workerfn, raise_unhandled_errors=False)
         expected = str(ValueError("prompted with: gimmie"))
         assert expected == str(results[0])
 
 
-def test_execute_with_prompts_override():
+def test_execute_with_prompts_override__raise_errors():
     """prompts issued while executing a worker function in parallel that has set
-    their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised"""
+    their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised.
+    If `raise_unhandled_errors` is set to `True` (default), the `EOFError` will be re-thrown."""
 
     @execute.parallel
     def workerfn():
         with settings(abort_on_prompts=False):
             return operations.prompt("gimmie")
 
-    results = execute.execute(workerfn)
+    with pytest.raises(EOFError) as e:
+        execute.execute(workerfn)
+        expected = "EOF when reading a line"
+        assert expected == str(e)
 
-    # this is what Python will give you
-    expected = EOFError("EOF when reading a line")
 
-    assert str(expected) == str(results[0])
+def test_execute_with_prompts_override__swallow_errors():
+    """prompts issued while executing a worker function in parallel that has set
+    their `abort_on_prompts` to `False` will get the unsupported `EOFError` raised.
+    If `raise_unhandled_errors` is set to `False`, the `EOFError` is available in the results."""
+
+    @execute.parallel
+    def workerfn():
+        with settings(abort_on_prompts=False):
+            return operations.prompt("gimmie")
+
+    results = execute.execute(workerfn, raise_unhandled_errors=False)
+    expected = "EOF when reading a line"
+    assert expected == str(results[0])
 
 
 def test_execute_process_not_terminating(caplog):
