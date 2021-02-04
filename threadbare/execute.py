@@ -240,7 +240,7 @@ def execute_with_hosts(
     # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
     # it says 'for informational purposes only' and nothing we use depends on it, so I'm disabling for now
     # env['all_hosts'] = env['hosts']
-    default = "{host:15} {pipe}: {line}\n"
+    default = "{host:15} {pipe}: {line}\n"  # todo: revisit this
     line_template = line_template or state.ENV.get("line_template") or default
     with state.settings(line_template=line_template):
         results = execute(

@@ -248,7 +248,6 @@ def _print_line(output_pipe, line, **kwargs):
         "quiet": False,
         "line_template": "{host} {pipe}: {line}\n",  # "1.2.3.4  err: Foo not found\n"
         "display_prefix": True,  # strips everything in line_template before "{line}"
-        "display_aborts": True,  # ...?
         "custom_pipe": None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
@@ -302,7 +301,8 @@ def _process_output(output_pipe, result_list, **kwargs):
 
 
 def _print_running(command, output_pipe, **kwargs):
-    "essentially a LOG.info that must obey the formatting and rules of the command being exected"
+    """essentially a LOG.info that must obey the formatting and rules of the command being exected.
+    This is to mimic Fabric's behaviour because (of course) something somewhere relies on Fabric-style output."""
     keepers = ["display_running", "quiet", "discard_output", "line_template"]
     kwargs = subdict(kwargs, keepers)
     if kwargs["display_running"]:
@@ -310,6 +310,36 @@ def _print_running(command, output_pipe, **kwargs):
             command = [command]
         command = " ".join(command)
         return _print_line(output_pipe, command, custom_pipe="run", **kwargs)
+
+
+def abort(result, err_msg, **kwargs):
+    base_kwargs = {
+        "quiet": False,
+        "warn_only": False,
+        "display_aborts": True,
+        "abort_exception": RuntimeError,
+    }
+    global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+
+    if final_kwargs["warn_only"]:
+        if not final_kwargs["quiet"]:
+            LOG.warning(err_msg)
+        return result
+
+    if final_kwargs["display_aborts"]:
+        LOG.error("Fatal error: %s" % err_msg)
+
+    abort_exc_klass = final_kwargs["abort_exception"]
+    if abort_exc_klass:
+        exc = abort_exc_klass(err_msg)
+        setattr(exc, "result", result)
+        raise exc
+
+    # https://docs.python.org/3/library/exceptions.html#SystemExit
+    # # https://github.com/mathiasertl/fabric/blob/master/fabric/utils.py#L30-L63
+    exc = SystemExit(1)
+    exc.message = err_msg
+    raise exc
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
@@ -395,16 +425,8 @@ def remote(command, **kwargs):
         command,
     )
 
-    if final_kwargs["warn_only"]:
-        if not final_kwargs["quiet"]:
-            LOG.warning(err_msg)
-        return result
-
-    abort_exc_klass = final_kwargs["abort_exception"]
-    exc = abort_exc_klass(err_msg)
-    setattr(exc, "result", result)
-
-    raise exc
+    # if `warn_only` is True this function may still return a result
+    return abort(result, err_msg, **final_kwargs)
 
 
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L1100
@@ -544,15 +566,8 @@ def local(command, **kwargs):
         command,
     )
 
-    if final_kwargs["warn_only"]:
-        LOG.warning(err_msg)
-        return result
-
-    abort_exc_klass = final_kwargs["abort_exception"]
-    exc = abort_exc_klass(err_msg)
-    setattr(exc, "result", result)
-
-    raise exc
+    # if `warn_only` is True this function may still return a result
+    return abort(result, err_msg, **final_kwargs)
 
 
 def single_command(cmd_list):
