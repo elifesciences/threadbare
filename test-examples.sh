@@ -7,7 +7,7 @@ temp_dir="/tmp/sshd-dummy"
 # see ./tests-remote/sshd-server.sh
 # and ./tests-remote/ssh-client.sh
 echo "---------------"
-echo "looking for dummy ssh server"
+echo "looking for dummy ssh server, see ./tests-remote/sshd-server.sh"
 die=false
 exec 6<>/dev/tcp/localhost/8462 || {
     die=true

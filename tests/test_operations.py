@@ -619,7 +619,24 @@ def test_formatted_output_display_prefix():
 
 
 def test_formatted_output_display_running():
-    pass
+    cases = [
+        # command, expected output, more settings
+        ("ls -l", "1.2.3.4 run: ls -l\n", {"host_string": "1.2.3.4"}),
+        ("ls -l", "ls -l\n", {"host_string": "1.2.3.4", "display_prefix": False}),
+        ("ls -l", "", {"host_string": "1.2.3.4", "quiet": True}),
+        (
+            "ls -l",
+            "[1.2.3.4] (run) ls -l\n",
+            {"host_string": "1.2.3.4", "line_template": "[{host}] ({pipe}) {line}\n"},
+        ),
+    ]
+    for command, expected, settings in cases:
+        strbuffer = StringIO()
+        with state.settings(**settings):
+            operations._print_running(
+                command, strbuffer, display_running=True, **settings
+            )
+        assert expected == strbuffer.getvalue()
 
 
 def test_formatted_output_display_aborts():

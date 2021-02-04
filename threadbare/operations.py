@@ -246,16 +246,19 @@ def _print_line(output_pipe, line, **kwargs):
     base_kwargs = {
         "discard_output": False,
         "quiet": False,
-        "line_template": "{host}  {pipe}: {line}\n",  # "1.2.3.4  err: Foo not found\n"
-        "display_running": True,  # emit a 'Running command: ./foo baz --bar' prior to running command.
+        "line_template": "{host} {pipe}: {line}\n",  # "1.2.3.4  err: Foo not found\n"
         "display_prefix": True,  # strips everything in line_template before "{line}"
         "display_aborts": True,  # ...?
+        "custom_pipe": None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
     if not final_kwargs["quiet"]:
         # useful values that can be part of the template
         pipe_type = "err" if output_pipe == sys.stderr else "out"
+        if final_kwargs["custom_pipe"]:
+            pipe_type = final_kwargs["custom_pipe"]  # like "run"
+
         dt = datetime.now()
         template_kwargs = {
             "line": line,
@@ -298,6 +301,17 @@ def _process_output(output_pipe, result_list, **kwargs):
         return new_results
 
 
+def _print_running(command, output_pipe, **kwargs):
+    "essentially a LOG.info that must obey the formatting and rules of the command being exected"
+    keepers = ["display_running", "quiet", "discard_output", "line_template"]
+    kwargs = subdict(kwargs, keepers)
+    if kwargs["display_running"]:
+        if not isinstance(command, list):
+            command = [command]
+        command = " ".join(command)
+        return _print_line(output_pipe, command, custom_pipe="run", **kwargs)
+
+
 # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L338
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L898-L901
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L975
@@ -318,6 +332,7 @@ def remote(command, **kwargs):
 
     # parameters we're interested in and their default values
     base_kwargs = _ssh_default_settings()
+    base_kwargs.update({"display_running": True})
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
     # wrap the command up
@@ -352,6 +367,7 @@ def remote(command, **kwargs):
     # TODO: validate `_execute`s args. `host_string` can't be None for example
 
     # run command
+    _print_running(command, sys.stdout, **final_kwargs)
     result = _execute(**execute_kwargs)
 
     # handle stdout/stderr streams
@@ -448,6 +464,7 @@ def local(command, **kwargs):
         "capture": False,
         "timeout": None,
         "quiet": False,
+        "display_running": True,
         "warn_only": False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
         "abort_exception": RuntimeError,
     }
@@ -488,12 +505,14 @@ def local(command, **kwargs):
         if final_kwargs["use_shell"]:
             command = sudo_wrap_command(command)
         else:
-            # lsh@2020-04: is this good enough? nothing uses local+noshell+sudo
+            # lsh@2020-04: is this a good enough sudo command?
+            # nothing uses local+noshell+sudo (at time of writing)
             command = ["sudo", "--non-interactive"] + command
 
     proc = subprocess.Popen(
         command, shell=final_kwargs["use_shell"], stdout=out_stream, stderr=err_stream
     )
+    _print_running(command, sys.stdout, **final_kwargs)
     if final_kwargs["timeout"]:
         timer = Timer(final_kwargs["timeout"], proc.kill)
         try:
