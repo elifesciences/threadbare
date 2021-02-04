@@ -236,14 +236,21 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
 def _print_line(output_pipe, line, **kwargs):
     """writes the given `line` (string) to the given `output_pipe` (file-like object)
     if `quiet` is True, `line` is *not* written to `output_pipe`.
-    if `discard_output` is True, `line` is not returned and output is not accumulated in memory"""
+    if `discard_output` is True, `line` is *not* returned and output does *not* accumulate in memory."""
 
     if not common.PY3:
         # in python2, assume the data we're reading is utf-8 otherwise the call to `.format`
         # below will attempt to encode the string as ascii and fail with an `UnicodeEncodeError`
         line = line.encode("utf-8")
 
-    base_kwargs = {"discard_output": False, "quiet": False, "line_template": "{line}\n"}
+    base_kwargs = {
+        "discard_output": False,
+        "quiet": False,
+        "line_template": "{host}  {pipe}: {line}\n",  # "1.2.3.4  err: Foo not found\n"
+        "display_running": True,  # emit a 'Running command: ./foo baz --bar' prior to running command.
+        "display_prefix": True,  # strips everything in line_template before "{line}"
+        "display_aborts": True,  # ...?
+    }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
     if not final_kwargs["quiet"]:
@@ -265,6 +272,13 @@ def _print_line(output_pipe, line, **kwargs):
 
         # render template and write to given pipe
         template = final_kwargs["line_template"]
+
+        if not final_kwargs["display_prefix"]:
+            try:
+                template = template[template.index("{line}") :]
+            except ValueError:  # "substring not found"
+                pass
+
         output_pipe.write(template.format(**template_kwargs))
 
     if not final_kwargs["discard_output"]:
@@ -659,7 +673,7 @@ def _transfer_fn(client, direction, **kwargs):
         # - https://github.com/ParallelSSH/parallel-ssh/issues/177
         # however, SCP is buggy and may randomly hang or complete without uploading anything.
         # take slow and reliable over fast and buggy.
-        "transfer_protocol": "rsync", # "sftp",  # "scp"
+        "transfer_protocol": "rsync",  # "sftp",  # "scp"
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 

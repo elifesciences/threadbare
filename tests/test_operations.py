@@ -24,13 +24,14 @@ PEM = "/home/testuser/.ssh/id_rsa"
 
 
 def test_hide():
-    "`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric."
+    """`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric.
+    see `test_local_quiet_param` and `test_remote_quiet_param`"""
     with operations.hide():
         assert state.ENV == {"quiet": True}
 
 
 def test_hide_w_args():
-    "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored"
+    "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored (for now)"
     with operations.hide("egg"):
         assert state.ENV == {"quiet": True}
 
@@ -534,6 +535,7 @@ def test_single_command():
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
 
 
+# todo: test_remote_quiet_param
 def test_local_quiet_param():
     "when quiet=True, nothing is sent to stdout or stderr"
     cmd = lambda: operations.local(
@@ -591,6 +593,37 @@ def test_formatted_output_unicode():
     with state.settings(line_template=line_template):
         result = operations._print_line(StringIO(), unicode_point)
         assert expected_stdout == result
+
+
+def test_formatted_output_display_prefix():
+    "a line of output can have it's prefix stripped"
+    cases = [
+        # (line template, what is printed to given pipe (stringbuffer, stdout, stderr, etc), what is returned to user)
+        ("{line}", "hello, world", "hello, world"),
+        ("{host} {pipe}: {line}", "hello, world", "hello, world"),
+        ("{host} {pipe}: ", "1.2.3.4 out: ", "hello, world"),
+        ("{line} {host}", "hello, world 1.2.3.4", "hello, world"),
+        ("{line} {line}", "hello, world hello, world", "hello, world"),
+    ]
+    for given_template, expected_stdout, expected_return in cases:
+        strbuffer = StringIO()
+        settings = {
+            "host_string": "1.2.3.4",
+            "line_template": given_template,
+            "display_prefix": False,
+        }
+        with state.settings(**settings):
+            result = operations._print_line(strbuffer, "hello, world")
+            assert expected_stdout == strbuffer.getvalue()
+            assert expected_return == result
+
+
+def test_formatted_output_display_running():
+    pass
+
+
+def test_formatted_output_display_aborts():
+    pass
 
 
 def test_rsync_upload_command():
