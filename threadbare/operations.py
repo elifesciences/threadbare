@@ -247,7 +247,7 @@ def _print_line(output_pipe, line, **kwargs):
         "discard_output": False,
         "quiet": False,
         "line_template": "{host} {pipe}: {line}\n",  # "1.2.3.4  err: Foo not found\n"
-        "display_prefix": True,  # strips everything in line_template before "{line}"
+        "display_prefix": True,  # strips everything in `line_template` before "{line}"
         "custom_pipe": None,
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
@@ -279,6 +279,8 @@ def _print_line(output_pipe, line, **kwargs):
             try:
                 template = template[template.index("{line}") :]
             except ValueError:  # "substring not found"
+                msg = "'display_prefix' option ignored: '{line}' not found in 'line_template' setting"
+                LOG.warn(msg)
                 pass
 
         output_pipe.write(template.format(**template_kwargs))
@@ -301,8 +303,10 @@ def _process_output(output_pipe, result_list, **kwargs):
 
 
 def _print_running(command, output_pipe, **kwargs):
-    """essentially a LOG.info that must obey the formatting and rules of the command being exected.
-    This is to mimic Fabric's behaviour because (of course) something somewhere relies on Fabric-style output."""
+    """Prints the command to be run on a line of output prior to executing a command.
+    Obeys the formatting and rules of the context in which the command is being exected.
+    Deprecated. This is to mimic Fabric's command output until we're sure nothing depends on it.
+    It will be replaced with a standard LOG.info output eventually."""
     keepers = ["display_running", "quiet", "discard_output", "line_template"]
     kwargs = subdict(kwargs, keepers)
     if kwargs["display_running"]:
@@ -313,6 +317,9 @@ def _print_running(command, output_pipe, **kwargs):
 
 
 def abort(result, err_msg, **kwargs):
+    """raises a `RuntimeError` with the given `err_msg` and the given `result` attached to it's `.result` property.
+    issues a warning and returns the given `result` if `settings.warn_only` is `True`.
+    raises a SystemExit with a return code of `1` if `settings.abort_exception` is set to None."""
     base_kwargs = {
         "quiet": False,
         "warn_only": False,
@@ -327,7 +334,8 @@ def abort(result, err_msg, **kwargs):
         return result
 
     if final_kwargs["display_aborts"]:
-        LOG.error("Fatal error: %s" % err_msg)
+        if not final_kwargs["quiet"]:
+            LOG.error("Fatal error: %s" % err_msg)
 
     abort_exc_klass = final_kwargs["abort_exception"]
     if abort_exc_klass:

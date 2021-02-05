@@ -535,7 +535,6 @@ def test_single_command():
         assert expected == actual, "failed case. %r != %r" % (expected, actual)
 
 
-# todo: test_remote_quiet_param
 def test_local_quiet_param():
     "when quiet=True, nothing is sent to stdout or stderr"
     cmd = lambda: operations.local(
@@ -612,13 +611,16 @@ def test_formatted_output_display_prefix():
             "line_template": given_template,
             "display_prefix": False,
         }
-        with state.settings(**settings):
-            result = operations._print_line(strbuffer, "hello, world")
-            assert expected_stdout == strbuffer.getvalue()
-            assert expected_return == result
+        # suppress warning about a missing '{line}' in `line_template` (case 3)
+        with patch("threadbare.operations.LOG.warn"):
+            with state.settings(**settings):
+                result = operations._print_line(strbuffer, "hello, world")
+                assert expected_stdout == strbuffer.getvalue()
+                assert expected_return == result
 
 
 def test_formatted_output_display_running():
+    "the 'print running' function obeys formatting rules"
     cases = [
         # command, expected output, more settings
         ("ls -l", "1.2.3.4 run: ls -l\n", {"host_string": "1.2.3.4"}),
@@ -639,8 +641,48 @@ def test_formatted_output_display_running():
         assert expected == strbuffer.getvalue()
 
 
-def test_formatted_output_display_aborts():
-    pass
+def test_abort():
+    "raise a useful RuntimeError by default"
+    expected = result = {"foo": "bar"}
+    with pytest.raises(RuntimeError) as exc:
+        operations.abort(result, "failed to succeed")
+        assert expected == exc.result
+
+
+def test_abort_sysexit():
+    "attempt to exit application when `abort_exception` is disabled."
+    result = {"foo": "bar"}
+    with state.settings(abort_exception=None):
+        with pytest.raises(SystemExit):
+            operations.abort(result, "failed to succeed")
+
+
+def test_abort_warn_only():
+    "return given result if `settings.warn_only` is `True`"
+    expected = result = {"foo": "bar"}
+    with state.settings(warn_only=True):
+        actual = operations.abort(result, "failed to succeed")
+        assert expected == actual
+
+
+def test_abort_display_aborts_message():
+    "abort message is displayed when `settings.display_aborts` is `True`"
+    result = {"foo": "bar"}
+    with state.settings(display_aborts=True):
+        with patch("threadbare.operations.LOG.error") as mock:
+            with pytest.raises(RuntimeError):
+                operations.abort(result, "failed to succeed")
+            mock.assert_called_once_with("Fatal error: failed to succeed")
+
+
+def test_abort_display_aborts_message_when_quiet():
+    "abort message is *not* displayed when `settings.display_aborts` is `True` and `settings.quiet` is also `True`"
+    result = {"foo": "bar"}
+    with state.settings(display_aborts=True, quiet=True):
+        with patch("threadbare.operations.LOG.error") as mock:
+            with pytest.raises(RuntimeError):
+                operations.abort(result, "failed to succeed")
+            mock.assert_not_called()
 
 
 def test_rsync_upload_command():
