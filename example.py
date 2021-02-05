@@ -3,7 +3,7 @@ import pytest
 import os, shutil, tempfile
 from os.path import join, basename
 from functools import partial
-from io import BytesIO
+from io import BytesIO, StringIO
 from threadbare import execute, state, common, operations
 from threadbare.state import settings
 from threadbare.operations import (
@@ -28,7 +28,7 @@ HOST = "127.0.0.1"
 PORT = os.environ.get("THREADBARE_TEST_PORT")
 USER = os.environ.get("THREADBARE_TEST_USER")
 KEY = os.environ.get("THREADBARE_TEST_PUBKEY", None)
-TRANSFER_PROTOCOL = os.environ.get("THREADBARE_TEST_TRANSFER_PROTOCOL")
+TRANSFER_PROTOCOL = os.environ.get("THREADBARE_TEST_TRANSFER_PROTOCOL", "scp")
 
 _help_text = """the environment variables below must be defined before executing this script:
 THREADBARE_TEST_PORT=
@@ -686,6 +686,27 @@ def test_upload_and_download_a_file_using_byte_buffers():
             download_unicode_buffer = BytesIO()
             download(remote_file_name, download_unicode_buffer)
             assert download_unicode_buffer.getvalue() == payload
+
+
+def test_upload_a_file_using_string_buffers():
+    """contents of a StringIO buffer can be uploaded to a remote file,
+    and the contents of a remote file can be downloaded to a StringIO buffer."""
+    with empty_remote_fixture() as remote_env:
+        with test_settings(quiet=True):
+            payload = "foo-bar-baz"
+            uploadable_string_buffer = StringIO(payload)
+            remote_file_name = join(remote_env["temp-dir"], "string-buffer-test")
+
+            upload(uploadable_string_buffer, remote_file_name)
+            assert remote_file_exists(remote_file_name)
+
+            result = remote('cat "%s"' % remote_file_name)
+            assert result["succeeded"]
+            assert result["stdout"] == [payload]
+
+            download_string_buffer = StringIO()
+            download(remote_file_name, download_string_buffer)
+            assert download_string_buffer.getvalue() == payload
 
 
 def test_check_many_remote_files():
