@@ -147,7 +147,6 @@ def _ssh_default_settings():
         "use_sudo": False,
         "combine_stderr": True,
         "quiet": False,
-        
         "remote_working_dir": None,
         "timeout": None,
         "warn_only": False,  # https://github.com/mathiasertl/fabric/blob/master/fabric/state.py#L301-L305
