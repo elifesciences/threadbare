@@ -24,13 +24,14 @@ PEM = "/home/testuser/.ssh/id_rsa"
 
 
 def test_hide():
-    "`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric."
+    """`hide` in threadbare just sets quiet=True. It's much more fine grained in fabric.
+    see `test_local_quiet_param` and `test_remote_quiet_param`"""
     with operations.hide():
         assert state.ENV == {"quiet": True}
 
 
 def test_hide_w_args():
-    "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored"
+    "`hide` in threadbare supports arguments for the types of things to be hidden, all of which are ignored (for now)"
     with operations.hide("egg"):
         assert state.ENV == {"quiet": True}
 
@@ -591,6 +592,97 @@ def test_formatted_output_unicode():
     with state.settings(line_template=line_template):
         result = operations._print_line(StringIO(), unicode_point)
         assert expected_stdout == result
+
+
+def test_formatted_output_display_prefix():
+    "a line of output can have it's prefix stripped"
+    cases = [
+        # (line template, what is printed to given pipe (stringbuffer, stdout, stderr, etc), what is returned to user)
+        ("{line}", "hello, world", "hello, world"),
+        ("{host} {pipe}: {line}", "hello, world", "hello, world"),
+        ("{host} {pipe}: ", "1.2.3.4 out: ", "hello, world"),
+        ("{line} {host}", "hello, world 1.2.3.4", "hello, world"),
+        ("{line} {line}", "hello, world hello, world", "hello, world"),
+    ]
+    for given_template, expected_stdout, expected_return in cases:
+        strbuffer = StringIO()
+        settings = {
+            "host_string": "1.2.3.4",
+            "line_template": given_template,
+            "display_prefix": False,
+        }
+        # suppress warning about a missing '{line}' in `line_template` (case 3)
+        with patch("threadbare.operations.LOG.warn"):
+            with state.settings(**settings):
+                result = operations._print_line(strbuffer, "hello, world")
+                assert expected_stdout == strbuffer.getvalue()
+                assert expected_return == result
+
+
+def test_formatted_output_display_running():
+    "the 'print running' function obeys formatting rules"
+    cases = [
+        # command, expected output, more settings
+        ("ls -l", "[1.2.3.4] run: ls -l\n", {"host_string": "1.2.3.4"}),
+        ("ls -l", "ls -l\n", {"host_string": "1.2.3.4", "display_prefix": False}),
+        ("ls -l", "", {"host_string": "1.2.3.4", "quiet": True}),
+        (
+            "ls -l",
+            "<1.2.3.4> (run) ls -l\n",
+            {"host_string": "1.2.3.4", "line_template": "<{host}> ({pipe}) {line}\n"},
+        ),
+    ]
+    for command, expected, settings in cases:
+        strbuffer = StringIO()
+        with state.settings(**settings):
+            operations._print_running(
+                command, strbuffer, display_running=True, **settings
+            )
+        assert expected == strbuffer.getvalue()
+
+
+def test_abort():
+    "raise a useful RuntimeError by default"
+    expected = result = {"foo": "bar"}
+    with pytest.raises(RuntimeError) as exc:
+        operations.abort(result, "failed to succeed")
+        assert expected == exc.result
+
+
+def test_abort_sysexit():
+    "attempt to exit application when `abort_exception` is disabled."
+    result = {"foo": "bar"}
+    with state.settings(abort_exception=None):
+        with pytest.raises(SystemExit):
+            operations.abort(result, "failed to succeed")
+
+
+def test_abort_warn_only():
+    "return given result if `settings.warn_only` is `True`"
+    expected = result = {"foo": "bar"}
+    with state.settings(warn_only=True):
+        actual = operations.abort(result, "failed to succeed")
+        assert expected == actual
+
+
+def test_abort_display_aborts_message():
+    "abort message is displayed when `settings.display_aborts` is `True`"
+    result = {"foo": "bar"}
+    with state.settings(display_aborts=True):
+        with patch("threadbare.operations.LOG.error") as mock:
+            with pytest.raises(RuntimeError):
+                operations.abort(result, "failed to succeed")
+            mock.assert_called_once_with("Fatal error: failed to succeed")
+
+
+def test_abort_display_aborts_message_when_quiet():
+    "abort message is *not* displayed when `settings.display_aborts` is `True` and `settings.quiet` is also `True`"
+    result = {"foo": "bar"}
+    with state.settings(display_aborts=True, quiet=True):
+        with patch("threadbare.operations.LOG.error") as mock:
+            with pytest.raises(RuntimeError):
+                operations.abort(result, "failed to succeed")
+            mock.assert_not_called()
 
 
 def test_rsync_upload_command():
