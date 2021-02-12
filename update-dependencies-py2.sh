@@ -7,3 +7,4 @@ source venv/bin/activate
 pip install wheel pip --upgrade
 VIRTUAL_ENV="venv" pipenv sync
 pip install pytest pytest-cov mock
+VIRTUAL_ENV="venv" pipenv run pip freeze > requirements-py2.txt
