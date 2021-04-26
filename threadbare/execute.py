@@ -75,9 +75,10 @@ def process_status(running_p):
     return result
 
 
-def _parallel_execution(env, func, param_key, param_values, return_process_pool=False):
+def _parallel_execution(env, func, param_key, param_values, return_process_pool=False, overrides=None):
     "executes the given function in parallel to main process. blocks until processes are complete"
     results_q = Queue()
+    overrides = overrides or {}
     kwargs = {
         # 'env': ..., # each process will get a new state dictionary
         "worker_func": func,
@@ -87,6 +88,9 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     pool_size = getattr(func, "pool_size", None)
     pool_size = pool_size if pool_size is not None else 1
     pool_values = param_values or range(0, pool_size)
+
+    if "worker_func_list" in overrides:
+        pool_values = overrides["worker_func_list"]
 
     pool = []
     for idx, nth_val in enumerate(pool_values):
@@ -99,6 +103,9 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
 
         if param_key:
             new_env[param_key] = nth_val
+
+        if "worker_func_list" in overrides:
+            kwargs["worker_func"] = nth_val
 
         new_env["parallel"] = True
         # https://github.com/mathiasertl/fabric/blob/master/fabric/tasks.py#L223-L227
