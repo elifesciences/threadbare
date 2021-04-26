@@ -5,6 +5,7 @@ setup(
     version='1.1.4',
     description='A Fabric and Paramiko replacement library',
     long_description="A partial replacement of the Fabric/Paramiko library utilising ParallelSSH.",
+    long_description_content_type="text/markdown",
     url="https://github.com/elifesciences/threadbare",
     maintainer="Luke",
     maintainer_email="lsh-0@users.noreply.github.com",
