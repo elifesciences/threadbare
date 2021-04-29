@@ -9,7 +9,7 @@ python_version = "3.6"
 [packages]
 # pinned because of issues building the 20.x line
 gevent = "==1.4.0"
-parallel-ssh = "==1.9.*"
+parallel-ssh = "==1.10.*"
 # cryptography doesn't use semantic versioning
 # cryptography removed Py2 support in 3.4
 # cryptography has a build-time dependency on Rust in 3.5
