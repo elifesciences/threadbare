@@ -1,7 +1,7 @@
-atomicwrites==1.4.0
+atomicwrites==1.4.1
 attrs==21.4.0
 backports.functools-lru-cache==1.6.4
-cffi==1.15.0
+cffi==1.15.1
 configparser==4.0.2
 contextlib2==0.6.0.post1
 coverage==5.5
@@ -14,7 +14,7 @@ mock==3.0.5
 more-itertools==5.0.0
 packaging==20.9
 parallel-ssh==1.10.0
-paramiko==2.10.4
+paramiko==2.11.0
 pathlib2==2.3.7.post1
 pluggy==0.13.1
 py==1.11.0
