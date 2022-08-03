@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
-<meta name="generator" content="pdoc 0.9.1" />
+<meta name="generator" content="pdoc 0.10.0" />
 <title>threadbare.execute API documentation</title>
 <meta name="description" content="" />
 <link href='/threadbare/resources/third-party/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
@@ -24,7 +24,8 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">import copy
+<pre><code class="python">import traceback
+import copy
 from multiprocessing import Process, Queue
 import time
 from .common import first
@@ -77,9 +78,7 @@ def _parallel_execution_worker_wrapper(env, worker_func, name, queue):
         result = worker_func()
         queue.put({&#34;name&#34;: name, &#34;result&#34;: result})
     except BaseException as unhandled_exception:
-        # kept for debugging
-        # import traceback
-        # traceback.print_exc()
+        traceback.print_exc()
 
         # &#34;Note that exit handlers and finally clauses, etc., will not be executed.&#34;
         # - https://docs.python.org/2/library/multiprocessing.html#multiprocessing.Process.terminate
@@ -106,9 +105,9 @@ def _parallel_execution(env, func, param_key, param_values, return_process_pool=
     &#34;executes the given function in parallel to main process. blocks until processes are complete&#34;
     results_q = Queue()
     kwargs = {
-        #&#39;env&#39;: ..., # each process will get a new state dictionary
+        # &#39;env&#39;: ..., # each process will get a new state dictionary
         &#34;worker_func&#34;: func,
-        #&#39;name&#39;: ..., # a name is assigned on process start
+        # &#39;name&#39;: ..., # a name is assigned on process start
         &#34;queue&#34;: results_q,
     }
     pool_size = getattr(func, &#34;pool_size&#34;, None)
@@ -193,7 +192,7 @@ def _serial_execution(func, param_key, param_values):
     return result_list
 
 
-def execute(func, param_key=None, param_values=None):
+def execute(func, param_key=None, param_values=None, raise_unhandled_errors=True):
     &#34;&#34;&#34;inspects a given function and then executes it either serially or in another process using Python&#39;s `multiprocessing` module.
     `param` and `param_list` control the number of processes spawned and the name of the parameter passed to the function.
 
@@ -206,7 +205,9 @@ def execute(func, param_key=None, param_values=None):
     `param` and `param_list` are optional, but if one is specified then so must the other.
 
     parent process blocks until all child processes have completed.
-    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;&#34;&#34;&#34;
+    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;.
+
+    when `raise_unhandled_errors` is `True` (default), the first result that is an exception will be re-raised.&#34;&#34;&#34;
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function&#39;s environment is
     # correct before passing it to `_execute` that does the actual magic.
@@ -233,16 +234,27 @@ def execute(func, param_key=None, param_values=None):
         )
 
     if hasattr(func, &#34;parallel&#34;) and func.parallel:
-        result_list = _parallel_execution(state.ENV, func, param_key, param_values)
-        return [result[&#34;result&#34;] for result in result_list]
+        result_payload_list = _parallel_execution(
+            state.ENV, func, param_key, param_values
+        )
+        response = []
+        for result_payload in result_payload_list:
+            if (
+                isinstance(result_payload[&#34;result&#34;], BaseException)
+                and raise_unhandled_errors
+            ):
+                unhandled_error = result_payload[&#34;result&#34;]
+                raise unhandled_error
+            response.append(result_payload[&#34;result&#34;])
+        return response
     return _serial_execution(func, param_key, param_values)
 
 
-def execute_with_hosts(func, hosts=None, line_template=None):
+def execute_with_hosts(func, hosts=None, raise_unhandled_errors=True):
     &#34;&#34;&#34;convenience wrapper around `execute`. calls `execute` on given `func` for each host in `hosts`.
     The host is available within the worker function&#39;s `env` as `host_string`.&#34;&#34;&#34;
     host_list = hosts or state.ENV.get(&#34;hosts&#34;) or []
-    assert isinstance(host_list, list), &#34;hosts must be a list&#34;
+    assert isinstance(host_list, list) and host_list, &#34;&#39;hosts&#39; must be a non-empty list&#34;
     # Fabric may know about many hosts (&#39;all_hosts&#39;) but only be acting upon a subset of them (&#39;hosts&#39;)
     # - https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
     # set here:
@@ -252,10 +264,12 @@ def execute_with_hosts(func, hosts=None, line_template=None):
     # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
     # it says &#39;for informational purposes only&#39; and nothing we use depends on it, so I&#39;m disabling for now
     # env[&#39;all_hosts&#39;] = env[&#39;hosts&#39;]
-    default = &#34;{host:15} {pipe}: {line}\n&#34;
-    line_template = line_template or state.ENV.get(&#34;line_template&#34;) or default
-    with state.settings(line_template=line_template):
-        results = execute(func, param_key=&#34;host_string&#34;, param_values=host_list)
+    results = execute(
+        func,
+        param_key=&#34;host_string&#34;,
+        param_values=host_list,
+        raise_unhandled_errors=raise_unhandled_errors,
+    )
     # results are ordered so we can do this
     return dict(zip(host_list, results))  # {&#39;192.168.0.1&#39;: [], &#39;192.169.0.3&#39;: []}</code></pre>
 </details>
@@ -268,7 +282,7 @@ def execute_with_hosts(func, hosts=None, line_template=None):
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="threadbare.execute.execute"><code class="name flex">
-<span>def <span class="ident">execute</span></span>(<span>func, param_key=None, param_values=None)</span>
+<span>def <span class="ident">execute</span></span>(<span>func, param_key=None, param_values=None, raise_unhandled_errors=True)</span>
 </code></dt>
 <dd>
 <section class="desc"><p>inspects a given function and then executes it either serially or in another process using Python's <code>multiprocessing</code> module.
@@ -279,12 +293,13 @@ def execute_with_hosts(func, hosts=None, line_template=None):
 <p>will ensure that <code>somefunc</code> has the (local) state property 'host' with a value of one of the above when executed.</p>
 <p><code>param</code> and <code>param_list</code> are optional, but if one is specified then so must the other.</p>
 <p>parent process blocks until all child processes have completed.
-returns a map of execution data with the return values of the individual executions available under 'result'</p></section>
+returns a map of execution data with the return values of the individual executions available under 'result'.</p>
+<p>when <code>raise_unhandled_errors</code> is <code>True</code> (default), the first result that is an exception will be re-raised.</p></section>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def execute(func, param_key=None, param_values=None):
+<pre><code class="python">def execute(func, param_key=None, param_values=None, raise_unhandled_errors=True):
     &#34;&#34;&#34;inspects a given function and then executes it either serially or in another process using Python&#39;s `multiprocessing` module.
     `param` and `param_list` control the number of processes spawned and the name of the parameter passed to the function.
 
@@ -297,7 +312,9 @@ returns a map of execution data with the return values of the individual executi
     `param` and `param_list` are optional, but if one is specified then so must the other.
 
     parent process blocks until all child processes have completed.
-    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;&#34;&#34;&#34;
+    returns a map of execution data with the return values of the individual executions available under &#39;result&#39;.
+
+    when `raise_unhandled_errors` is `True` (default), the first result that is an exception will be re-raised.&#34;&#34;&#34;
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function&#39;s environment is
     # correct before passing it to `_execute` that does the actual magic.
@@ -324,13 +341,24 @@ returns a map of execution data with the return values of the individual executi
         )
 
     if hasattr(func, &#34;parallel&#34;) and func.parallel:
-        result_list = _parallel_execution(state.ENV, func, param_key, param_values)
-        return [result[&#34;result&#34;] for result in result_list]
+        result_payload_list = _parallel_execution(
+            state.ENV, func, param_key, param_values
+        )
+        response = []
+        for result_payload in result_payload_list:
+            if (
+                isinstance(result_payload[&#34;result&#34;], BaseException)
+                and raise_unhandled_errors
+            ):
+                unhandled_error = result_payload[&#34;result&#34;]
+                raise unhandled_error
+            response.append(result_payload[&#34;result&#34;])
+        return response
     return _serial_execution(func, param_key, param_values)</code></pre>
 </details>
 </dd>
 <dt id="threadbare.execute.execute_with_hosts"><code class="name flex">
-<span>def <span class="ident">execute_with_hosts</span></span>(<span>func, hosts=None, line_template=None)</span>
+<span>def <span class="ident">execute_with_hosts</span></span>(<span>func, hosts=None, raise_unhandled_errors=True)</span>
 </code></dt>
 <dd>
 <section class="desc"><p>convenience wrapper around <code><a title="threadbare.execute.execute" href="#threadbare.execute.execute">execute()</a></code>. calls <code><a title="threadbare.execute.execute" href="#threadbare.execute.execute">execute()</a></code> on given <code>func</code> for each host in <code>hosts</code>.
@@ -339,11 +367,11 @@ The host is available within the worker function's <code>env</code> as <code>hos
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def execute_with_hosts(func, hosts=None, line_template=None):
+<pre><code class="python">def execute_with_hosts(func, hosts=None, raise_unhandled_errors=True):
     &#34;&#34;&#34;convenience wrapper around `execute`. calls `execute` on given `func` for each host in `hosts`.
     The host is available within the worker function&#39;s `env` as `host_string`.&#34;&#34;&#34;
     host_list = hosts or state.ENV.get(&#34;hosts&#34;) or []
-    assert isinstance(host_list, list), &#34;hosts must be a list&#34;
+    assert isinstance(host_list, list) and host_list, &#34;&#39;hosts&#39; must be a non-empty list&#34;
     # Fabric may know about many hosts (&#39;all_hosts&#39;) but only be acting upon a subset of them (&#39;hosts&#39;)
     # - https://github.com/mathiasertl/fabric/blob/master/sites/docs/usage/env.rst#all_hosts
     # set here:
@@ -353,10 +381,12 @@ The host is available within the worker function's <code>env</code> as <code>hos
     # - https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L386
     # it says &#39;for informational purposes only&#39; and nothing we use depends on it, so I&#39;m disabling for now
     # env[&#39;all_hosts&#39;] = env[&#39;hosts&#39;]
-    default = &#34;{host:15} {pipe}: {line}\n&#34;
-    line_template = line_template or state.ENV.get(&#34;line_template&#34;) or default
-    with state.settings(line_template=line_template):
-        results = execute(func, param_key=&#34;host_string&#34;, param_values=host_list)
+    results = execute(
+        func,
+        param_key=&#34;host_string&#34;,
+        param_values=host_list,
+        raise_unhandled_errors=raise_unhandled_errors,
+    )
     # results are ordered so we can do this
     return dict(zip(host_list, results))  # {&#39;192.168.0.1&#39;: [], &#39;192.169.0.3&#39;: []}</code></pre>
 </details>
@@ -455,7 +485,7 @@ if set and executor is given a set of values to use instead, <code>pool_size</co
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.1</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.10.0</a>.</p>
 </footer>
 <script src="/threadbare/resources/third-party/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 <script>hljs.initHighlightingOnLoad()</script>
