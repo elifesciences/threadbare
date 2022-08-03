@@ -11,4 +11,4 @@ find threadbare/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 find tests/ -regex "\(.*__pycache__.*\|*.py[co]\)" -delete
 
 pyflakes example.py threadbare/ tests/
-black example.py threadbare/ tests/ --target-version py27
+black example.py threadbare/ tests/ --target-version py36
