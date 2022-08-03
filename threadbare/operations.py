@@ -11,7 +11,7 @@ from pssh.clients.native import SSHClient as PSSHClient
 import gevent
 import io
 import logging
-from . import state, common
+from . import state
 from .common import (
     PromptedException,
     merge,
@@ -236,11 +236,6 @@ def _print_line(output_pipe, line, **kwargs):
     if `quiet` is True, `line` is *not* written to `output_pipe`.
     if `discard_output` is True, `line` is *not* returned and output does *not* accumulate in memory."""
 
-    if not common.PY3:
-        # in python2, assume the data we're reading is utf-8 otherwise the call to `.format`
-        # below will attempt to encode the string as ascii and fail with an `UnicodeEncodeError`
-        line = line.encode("utf-8")
-
     base_kwargs = {
         "discard_output": False,
         "quiet": False,
@@ -278,7 +273,7 @@ def _print_line(output_pipe, line, **kwargs):
                 template = template[template.index("{line}") :]
             except ValueError:  # "substring not found"
                 msg = "'display_prefix' option ignored: '{line}' not found in 'line_template' setting"
-                LOG.warn(msg)
+                LOG.warning(msg)
                 pass
 
         output_pipe.write(template.format(**template_kwargs))
@@ -498,14 +493,6 @@ def local(command, **kwargs):
     }
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
 
-    # TODO: once py2 support has been dropped, move this back to file head
-    devnull_opened = False
-    try:
-        from subprocess import DEVNULL  # py3
-    except ImportError:
-        devnull_opened = True
-        DEVNULL = open(os.devnull, "wb")
-
     if final_kwargs["capture"]:
         if final_kwargs["combine_stderr"]:
             out_stream = subprocess.PIPE
@@ -517,8 +504,8 @@ def local(command, **kwargs):
         if final_kwargs["quiet"]:
             # we're not capturing and we've been told to be quiet
             # send everything to /dev/null
-            out_stream = DEVNULL
-            err_stream = DEVNULL
+            out_stream = subprocess.DEVNULL
+            err_stream = subprocess.DEVNULL
         else:
             out_stream = None
             err_stream = None
@@ -560,9 +547,6 @@ def local(command, **kwargs):
         "stdout": (stdout or b"").decode("utf-8").splitlines(),
         "stderr": (stderr or b"").decode("utf-8").splitlines(),
     }
-
-    if devnull_opened:
-        DEVNULL.close()
 
     if result["succeeded"]:
         return result

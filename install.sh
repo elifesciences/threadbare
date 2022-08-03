@@ -1,14 +1,10 @@
 #!/bin/bash
+set -e
 
-env=${1:-} # "-dev" or nothing
+env=${1:-""} # "-dev" or nothing
 
 . mkvenv.sh
 
 source venv/bin/activate
-pip install wheel
-
-if [ -e venv/bin/python2.7 ]; then
-    pip install -r "requirements-py2.txt"
-else
-    pip install -r "requirements$env.txt"
-fi
+pip install pip wheel --upgrade
+pip install -r "requirements$env.txt"

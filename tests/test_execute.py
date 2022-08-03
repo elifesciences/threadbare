@@ -1,11 +1,7 @@
 import pytest
 import time
 import logging
-
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
+from unittest.mock import patch
 from threadbare import execute, operations
 from threadbare.state import settings
 from threadbare.common import PromptedException

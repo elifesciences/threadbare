@@ -2,7 +2,7 @@
 set -e
 
 python=''
-pybinlist=("python3.8" "python3" "python2.7")
+pybinlist=("python3.8" "python3.6")
 
 for pybin in ${pybinlist[*]}; do
     which "$pybin" &> /dev/null || continue

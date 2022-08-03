@@ -6,6 +6,7 @@ verify_ssl = true
 [requires]
 python_version = "3.8"
 
+# note! remember to update setup.py
 [packages]
 # pinned because of issues building the 20.x line
 #gevent = "==1.4.0"
@@ -15,12 +16,12 @@ parallel-ssh = "==1.10.*"
 # cryptography doesn't use semantic versioning
 # cryptography removed Py2 support in 3.4
 # cryptography has a build-time dependency on Rust in 3.5
-cryptography = ">=3.3.2,<3.4"
+#cryptography = ">=3.3.2,<3.4"
 
 [dev-packages]
 pytest = "*"
 pytest-cov = "*"
 pdoc3 = "*"
 pyflakes = "*"
-black = "==20.8b1"
+black = "==22.6.0"
 
