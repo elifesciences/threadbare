@@ -61,7 +61,7 @@ def test__shell_escape():
 
 
 def test__shell_escape_bad_cases():
-    bad_types = [[None, TypeError][b"", TypeError]]
+    bad_types = [[None, TypeError], [b"", TypeError]]
     for given, expected in bad_types:
         with pytest.raises(expected):
             common._shell_escape(given)
