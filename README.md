@@ -5,13 +5,19 @@ A partial replacement for the slice of Fabric 1.x and Paramiko used in
 
 Threadbare supports Python 3.6 and greater.
 
-Threadbare removed support for Python 2 in major version `2.0.0`.
+Threadbare removed support for Python 2 in major version `3.0.0`.
 
 [Documentation](https://elifesciences.github.io/threadbare).
 
 ## installation
 
+As a library:
+
     pip install threadbare
+
+For development:
+
+    ./install.sh -dev
 
 ## usage
 

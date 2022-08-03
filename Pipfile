@@ -6,6 +6,7 @@ verify_ssl = true
 [requires]
 python_version = "3.8"
 
+# note! remember to update setup.py
 [packages]
 # pinned because of issues building the 20.x line
 #gevent = "==1.4.0"
