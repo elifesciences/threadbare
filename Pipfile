@@ -4,11 +4,13 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [requires]
-python_version = "3.6"
+python_version = "3.8"
 
 [packages]
 # pinned because of issues building the 20.x line
-gevent = "==1.4.0"
+#gevent = "==1.4.0"
+gevent = "<=21.8"
+# removed support for OSX python 3.6 in 1.11.0
 parallel-ssh = "==1.10.*"
 # cryptography doesn't use semantic versioning
 # cryptography removed Py2 support in 3.4
