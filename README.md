@@ -3,6 +3,10 @@
 A partial replacement for the slice of Fabric 1.x and Paramiko used in 
 [elifesciences/builder](https://github.com/elifesciences/builder).
 
+Threadbare supports Python 3.6 and greater.
+
+Threadbare removed support for Python 2 in major version `2.0.0`.
+
 [Documentation](https://elifesciences.github.io/threadbare).
 
 ## installation
