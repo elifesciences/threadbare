@@ -44,7 +44,8 @@ It's assumed the dummy sshd server is running and that the host is `localhost`.
 """
 assert (HOST and PORT and USER) and common.isint(PORT), _help_text
 
-test_settings = partial(
+# prefixed with an underscore so pytest doesn't pick it up
+_test_settings = partial(
     settings,
     user=USER,
     port=int(PORT),
@@ -203,14 +204,14 @@ def test_run_many_local_commands_in_parallel():
 
 def test_run_a_remote_command():
     "run a simple `remote` command"
-    with test_settings(quiet=True):
+    with _test_settings(quiet=True):
         result = remote(r'echo -e "\e[31mRed Text!!\e[0m"')
         assert result["succeeded"]
 
 
 def test_run_a_remote_command_but_hide_output():
     "run a simple `remote` command but don't print anything"
-    with test_settings():
+    with _test_settings():
         with hide():
             result = remote("echo hi!")
             # (nothing should have been emitted)
@@ -220,7 +221,7 @@ def test_run_a_remote_command_but_hide_output():
 
 def test_run_a_remote_command_as_root():
     "run a simple `remote` command as the root user"
-    with test_settings():
+    with _test_settings():
         result = remote_sudo("cd /root && echo tapdance in $(pwd)")
         assert result["succeeded"]
 
@@ -228,7 +229,7 @@ def test_run_a_remote_command_as_root():
 def test_run_a_remote_command_in_a_different_dir():
     "run a simple `remote` command in a different remote directory"
     with remote_fixture() as remote_env:
-        with test_settings():
+        with _test_settings():
             remote_dir = remote_env["temp-dir"]
             with rcd(remote_dir):
                 result = remote("pwd")
@@ -238,7 +239,7 @@ def test_run_a_remote_command_in_a_different_dir():
 
 def test_run_a_remote_command_with_separate_streams():
     "run a simple `remote` command and capture stdout and stderr separately"
-    with test_settings():
+    with _test_settings():
         result = remote(
             'echo "printed to standard out"; >&2 echo "printed to standard error"',
             combine_stderr=False,
@@ -250,7 +251,7 @@ def test_run_a_remote_command_with_separate_streams():
 
 def test_run_a_remote_command_with_shell_interpolation():
     "run a simple `remote` command including shell variables"
-    with test_settings(quiet=True):
+    with _test_settings(quiet=True):
         result = remote('foo=baz; echo "bar? $foo!"')
         assert result["succeeded"]
         assert ["bar? baz!"] == result["stdout"]
@@ -263,7 +264,7 @@ def test_run_a_remote_command_with_shell_interpolation():
 def test_run_a_remote_command_non_zero_return_code():
     """`remote` commands, like `local` commands, will raise a RuntimeError if the command they execute fails.
     the results of the command are still available via the `result` attribute on the exception object"""
-    with test_settings():
+    with _test_settings():
         with pytest.raises(RuntimeError) as err:
             remote("exit 123")
         exc = err.value
@@ -275,7 +276,7 @@ def test_run_a_remote_command_non_zero_return_code():
 def test_run_a_remote_command_non_zero_custom_exit():
     """`remote` commands, like `local` commands, may raise a custom exception if the command they execute fails.
     the results of the command are still available via the `result` attribute on the exception object"""
-    with test_settings():
+    with _test_settings():
         with pytest.raises(ValueError) as err:
             remote("exit 123", abort_exception=ValueError)
         exc = err.value
@@ -286,7 +287,7 @@ def test_run_a_remote_command_non_zero_custom_exit():
 
 def test_run_a_remote_command_non_zero_return_code_swallow_error():
     "`remote` commands, like `local` commands, can return the results of failed executions when `warn_only` is `True`"
-    with test_settings(warn_only=True):
+    with _test_settings(warn_only=True):
         result = remote("exit 123")
         assert result["return_code"] == 123
         assert result["failed"]
@@ -301,7 +302,7 @@ def test_run_many_remote_commands():
         "echo share the same",
         "echo ssh session",
     ]
-    with test_settings():
+    with _test_settings():
         for command in command_list:
             result = remote(command)
             assert result["succeeded"]
@@ -315,7 +316,7 @@ def test_run_many_remote_commands_singly():
         "echo are executed",
         "echo together",
     ]
-    with test_settings():
+    with _test_settings():
         result = remote(single_command(command_list))
         assert result["succeeded"]
 
@@ -334,7 +335,7 @@ def test_run_many_remote_commands_serially():
     def myfn():
         return remote(state.ENV["cmd"], capture=True)
 
-    with test_settings():
+    with _test_settings():
         results = execute.execute(myfn, param_key="cmd", param_values=command_list)
         assert len(results) == len(command_list)
         assert results[-2]["stdout"] == ["are executed"]
@@ -355,7 +356,7 @@ def test_run_many_remote_commands_in_parallel():
     def myfn():
         return remote(state.ENV["cmd"], capture=True)
 
-    with test_settings(quiet=True):
+    with _test_settings(quiet=True):
         results = execute.execute(myfn, param_key="cmd", param_values=command_list)
         assert len(results) == len(command_list)
         assert results[-2]["stdout"] == ["are executed"]
@@ -370,7 +371,7 @@ def test_remote_exceptions_in_parallel__raise_errors():
 
     workerfn = execute.parallel(workerfn, pool_size=1)
 
-    with test_settings():
+    with _test_settings():
         expected = RuntimeError(
             "remote() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
         )
@@ -388,7 +389,7 @@ def test_remote_exceptions_in_parallel__swallow_errors():
 
     workerfn = execute.parallel(workerfn, pool_size=1)
 
-    with test_settings():
+    with _test_settings():
         expected = RuntimeError(
             "remote() encountered an error (return code 1) while executing '/bin/bash -l -c \"exit 1\"'"
         )
@@ -400,7 +401,7 @@ def test_remote_exceptions_in_parallel__swallow_errors():
 def test_check_remote_files():
     "check that remote files can be found (or not)"
     with remote_fixture() as remote_env:
-        with test_settings():
+        with _test_settings():
             file_that_exists = join(remote_env["temp-files"]["small-file"])
             file_that_does_not_exist = join(remote_env["temp-dir"], "doesnot.exist")
             assert remote_file_exists(file_that_exists)
@@ -412,7 +413,7 @@ def _test_upload_and_download_a_file(transfer_protocol):
     assert it's contents are as expected"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings(transfer_protocol=transfer_protocol):
+            with _test_settings(transfer_protocol=transfer_protocol):
                 LOG.debug("modifying local file ...")
                 local_file_name = join(local_env["temp-dir"], "foo")
                 local('printf "foo" > %s' % local_file_name)
@@ -456,7 +457,7 @@ def test_upload_a_directory():  # you can't
     "attempting to upload a directory raises an exception"
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 with pytest.raises(ValueError):
                     upload(local_env["temp-dir"], remote_env["temp-dir"])
 
@@ -465,7 +466,7 @@ def test_upload_to_extant_remote_file():
     "the default policy is to overwrite files that exist."
     with empty_local_fixture():
         with remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 payload = b"foo"
                 remote_file = remote_env["temp-files"]["small-file"]
 
@@ -480,7 +481,7 @@ def test_upload_to_extant_remote_file_no_overwrite():
     "the default policy of overwriting files can be disabled when `override` is set to `False`."
     with empty_local_fixture():
         with remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 payload = b"foo"
                 remote_file = remote_env["temp-files"]["small-file"]
                 assert remote_file_exists(remote_file)
@@ -498,7 +499,7 @@ def test_upload_to_non_existant_remote_dir():
     "intermediate non-existant directories in a remote path will be created."
     with local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 non_existant_dir = "does/not/exist"
                 local_file = local_env["temp-files"]["small-file"]
                 remote_file_name = os.path.basename(local_file)
@@ -513,7 +514,7 @@ def test_download_to_extant_local_file():
     "the default policy is to overwrite files that exist."
     with local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 local_file = local_env["temp-files"]["small-file"]
                 assert os.path.exists(local_file)
 
@@ -531,7 +532,7 @@ def test_download_to_extant_local_file_no_overwrite():
     "the default policy of overwriting files can be disabled when `override` is set to `False`."
     with local_fixture() as local_env:
         with remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 local_file = local_env["temp-files"]["small-file"]
                 remote_file = remote_env["temp-files"]["medium-file"]
 
@@ -550,7 +551,7 @@ def test_download_a_directory():  # you can't
     # its possible as both parallel-ssh and paramiko use SFTP, but unsupported in threadbare.
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 # it becomes ambiguous if remote path is a file or a directory
                 remote_dir = remote_env["temp-dir"]
                 assert not remote_dir.endswith("/")
@@ -563,7 +564,7 @@ def test_download_an_obvious_directory():  # you can't
     Its possible as both parallel-ssh and paramiko use SFTP, but not supported."""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 # ensure we're dealing with an obvious directory
                 remote_dir = "%s/" % remote_env["temp-dir"].rstrip("/")
                 with pytest.raises(ValueError):
@@ -574,7 +575,7 @@ def test_download_a_file_to_a_directory():
     "a file can be downloaded to a directory and the name of the remote file will be used as the destination file"
     with empty_local_fixture() as local_env:
         with remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 local_dir = local_env["temp-dir"]
                 remote_file = remote_env["temp-files"]["small-file"]
                 expected_local_file = join(local_dir, basename(remote_file))
@@ -588,7 +589,7 @@ def test_download_a_file_to_a_relative_directory():
     "relative destinations are expanded to full paths before downloading"
     with remote_fixture() as remote_env:
         with empty_local_fixture() as local_env:
-            with test_settings():
+            with _test_settings():
                 with lcd(local_env["temp-dir"]):
                     remote_file = remote_env["temp-files"]["small-file"]
                     expected_local_file = join(
@@ -606,7 +607,7 @@ def test_download_a_file_to_a_non_existant_dir():
     this ensures behaviour is consistent across all transfer-protocols."""
     with remote_fixture() as remote_env:
         with empty_local_fixture() as local_env:
-            with test_settings():
+            with _test_settings():
                 with lcd(local_env["temp-dir"]):
                     remote_file = remote_env["temp-files"]["small-file"]
                     non_existant_dir = "does/not/exist"
@@ -624,7 +625,7 @@ def test_download_file_owned_by_root():
     "a file owned by root can be downloaded by the regular user if 'use_sudo' is True"
     with empty_local_fixture() as local_env:
         with remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 # create a root-only file on remote machine
                 remote_file_name = remote_env["temp-files"]["small-file"]
                 file_contents = "root users only!\n"
@@ -651,7 +652,7 @@ def test_upload_file_to_root_dir():
     "uploads a file as a regular user to a root-owned directory with `use_sudo`"
     with local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 remote_sudo('chown root:root -R "%s"' % remote_env["temp-dir"])
 
                 local_file_name = local_env["temp-files"]["small-file"]
@@ -671,7 +672,7 @@ def test_upload_and_download_a_file_using_byte_buffers():
     """contents of a BytesIO buffer can be uploaded to a remote file,
     and the contents of a remote file can be downloaded to a BytesIO buffer"""
     with empty_remote_fixture() as remote_env:
-        with test_settings(quiet=True):
+        with _test_settings(quiet=True):
             payload = b"foo-bar-baz"
             uploadable_unicode_buffer = BytesIO(payload)
             remote_file_name = join(remote_env["temp-dir"], "bytes-test")
@@ -692,7 +693,7 @@ def test_upload_a_file_using_string_buffers():
     """contents of a StringIO buffer can be uploaded to a remote file,
     and the contents of a remote file can be downloaded to a StringIO buffer."""
     with empty_remote_fixture() as remote_env:
-        with test_settings(quiet=True):
+        with _test_settings(quiet=True):
             payload = "foo-bar-baz"
             uploadable_string_buffer = StringIO(payload)
             remote_file_name = join(remote_env["temp-dir"], "string-buffer-test")
@@ -724,7 +725,7 @@ def test_check_many_remote_files():
         ]
 
         expected = [True, False]
-        with test_settings():
+        with _test_settings():
             result = execute.execute(
                 workerfn, param_key="remote_file", param_values=remote_file_list
             )
@@ -766,7 +767,7 @@ def test_line_formatting():
         },
     ]
 
-    with test_settings(line_template="[{host}] {pipe}: {line}\n"):
+    with _test_settings(line_template="[{host}] {pipe}: {line}\n"):
         results = execute.execute(
             workerfn,
             param_key="worker_num",
@@ -818,7 +819,7 @@ def test_run_script():
     "a simple shell script can be uploaded and executed and the results accessible"
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
                 open(local_script, "w").write(
                     r"""#!/bin/bash
@@ -838,7 +839,7 @@ def test_run_script_parallel():
     with each of the hosts' results accessible"""
     with empty_local_fixture() as local_env:
         with empty_remote_fixture() as remote_env:
-            with test_settings():
+            with _test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
                 open(local_script, "w").write(
                     r"""#!/bin/bash
