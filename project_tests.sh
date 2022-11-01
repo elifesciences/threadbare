@@ -45,5 +45,5 @@ THREADBARE_TEST_TRANSFER_PROTOCOL="$transfer_protocol" PYTHONPATH=threadbare/ \
         -vv \
         --cov=threadbare/ \
         --cov-report html --cov-report term \
-        --cov-fail-under 94
+        --cov-fail-under 93
 done
