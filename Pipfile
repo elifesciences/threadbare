@@ -13,10 +13,6 @@ python_version = "3.8"
 gevent = "<=21.8"
 # removed support for OSX python 3.6 in 1.11.0
 parallel-ssh = "==1.10.*"
-# cryptography doesn't use semantic versioning
-# cryptography removed Py2 support in 3.4
-# cryptography has a build-time dependency on Rust in 3.5
-#cryptography = ">=3.3.2,<3.4"
 
 [dev-packages]
 pytest = "*"
