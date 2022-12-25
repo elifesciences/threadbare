@@ -1,3 +1,7 @@
+from pssh import exceptions as pssh_exceptions
+from pssh.clients.native import SSHClient as PSSHClient
+import gevent
+
 from functools import wraps
 from datetime import datetime
 import tempfile
@@ -5,10 +9,7 @@ import contextlib
 import subprocess
 from threading import Timer
 import getpass
-from pssh import exceptions as pssh_exceptions
 import os, sys
-from pssh.clients.native import SSHClient as PSSHClient
-import gevent
 import io
 import logging
 from . import state
@@ -716,7 +717,7 @@ def _transfer_fn(client, direction, **kwargs):
                 # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
                 gevent.joinall(fn(local_file, remote_file), raise_error=True)
 
-            # lsh@2020-04, local testing didn't reveal anything but small files uploaded via SCP SCP during CI
+            # lsh@2020-04, local testing didn't reveal anything but small files uploaded via SCP during CI
             # were either missing or had empty bodies. SFTP seemed to be fine.
             # This sanity check seems to fix the issue (lending more credence to my theory it's an unflushed buffer somewhere),
             # when waiting 3 seconds between upload of file and check of file was still failing.
