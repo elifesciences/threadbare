@@ -17,10 +17,13 @@ Port 8462
 LogLevel INFO
 
 # Authentication:
+
+LoginGraceTime 5 # seconds
 PermitRootLogin no
 ## lsh-0: don't ever set this in a serious environment.
 ## this allows us to bypass some permissions requirements.
 StrictModes no
+MaxAuthTries 2
 
 PubkeyAuthentication yes
 
