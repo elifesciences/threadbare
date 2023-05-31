@@ -25,8 +25,6 @@ if [ "$dev" = "dev" ]; then
         # running tests adhoc, skip coverage reporting
         PYTHONPATH=threadbare/ python -m pytest \
             -vv \
-            --cov=threadbare/ \
-            --cov-report html --cov-report term \
             "$@"
     fi
 else
