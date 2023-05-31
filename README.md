@@ -41,7 +41,7 @@ with settings(host_string='my.server', warn_only=True):
 
 Run the [test suite](./test.sh) with `./test.sh`
 
-Individual tests can be run with `./test.sh -k test_fn_name`
+Individual tests can be run with `./test.sh example.py::test_fn_name`
 
 ## remote tests
 

@@ -1,0 +1,60 @@
+#	$OpenBSD: sshd_config,v 1.104 2021/07/02 05:11:21 dtucker Exp $
+
+# This is the sshd server system-wide configuration file.  See
+# sshd_config(5) for more information.
+
+# This sshd was compiled with PATH=/usr/local/sbin:/usr/local/bin:/usr/bin
+
+# The strategy used for options in the default sshd_config shipped with
+# OpenSSH is to specify options with their default value where
+# possible, but leave them commented.  Uncommented options override the
+# default value.
+
+Port 8462
+
+# Logging
+#LogLevel DEBUG
+LogLevel INFO
+
+# Authentication:
+
+LoginGraceTime 5 # seconds
+PermitRootLogin no
+## lsh-0: don't ever set this in a serious environment.
+## this allows us to bypass some permissions requirements.
+StrictModes no
+MaxAuthTries 2
+
+PubkeyAuthentication yes
+
+# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
+# but this is overridden so installations will only check .ssh/authorized_keys
+AuthorizedKeysFile	/tmp/sshd-dummy/.ssh/authorized_keys
+
+# For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
+HostbasedAuthentication no
+
+# Don't read the user's ~/.rhosts and ~/.shosts files
+IgnoreRhosts yes
+
+# To disable tunneled clear text passwords, change to no here!
+PasswordAuthentication no
+
+# Change to no to disable s/key passwords
+ChallengeResponseAuthentication no
+
+UsePAM no
+
+PidFile /tmp/sshd-dummy/sshd.pid
+
+# override default of no subsystems
+## lsh-0: necessary for uploads and downloads
+## 'internal-sftp' or a path?
+##  - https://serverfault.com/questions/660160/openssh-difference-between-internal-sftp-and-sftp-server
+## it also means we can handily avoid hardcoding a path that differs between arch and ubuntu
+#Subsystem sftp /usr/lib/ssh/sftp-server
+Subsystem sftp internal-sftp
+
+## lsh-0: the dummy key type we're generating (rsa) is no longer recommended.
+HostKeyAlgorithms +ssh-rsa
+PubkeyAcceptedAlgorithms +ssh-rsa

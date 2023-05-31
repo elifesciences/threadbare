@@ -28,4 +28,10 @@ export THREADBARE_TEST_PORT=8462
 export THREADBARE_TEST_USER="$USER"
 export THREADBARE_TEST_PUBKEY="$temp_dir/.ssh/dummy_user_key"
 source venv/bin/activate
-pytest example.py -vv "$@"
+
+args="$*"
+if [ -z "$args" ]; then
+    args="example.py"
+fi
+
+pytest -vv "$args"
