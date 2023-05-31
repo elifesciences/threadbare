@@ -32,6 +32,14 @@ trap 'cleanup' SIGINT
 # allow the dummy user to login to the dummy server
 cat "$temp_dir/.ssh/dummy_user_key.pub" > "$temp_dir/.ssh/authorized_keys"
 
+# OpenSSH on Ubuntu 20.04 is (currently) 8.2
+# OpenSSH on my development machine is 9.2
+# new configuration options in old configuration files will cause sshd to exit and the tests to fail.
+sshd_config="sshd_config"
+if ssh -V 2>&1 | grep 'OpenSSH_9\.'; then
+    sshd_config="sshd_config_9"
+fi
+
 # note! permissions checking has been disabled in sshd_config
 # see `StrictModes`
 
@@ -47,7 +55,7 @@ cat "$temp_dir/.ssh/dummy_user_key.pub" > "$temp_dir/.ssh/authorized_keys"
 2>&1 $(which sshd) \
     -D \
     -e \
-    -f "$SCRIPT_PATH/sshd_config" \
+    -f "$SCRIPT_PATH/$sshd_config" \
     -h "$temp_dir/.ssh/dummy_host_key" \
     | grep -v "Attempt to write login records by non-root user (aborting)"
 
