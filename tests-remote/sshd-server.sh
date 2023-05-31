@@ -55,6 +55,7 @@ fi
 2>&1 $(which sshd) \
     -D \
     -e \
+    -q \
     -f "$SCRIPT_PATH/$sshd_config" \
     -h "$temp_dir/.ssh/dummy_host_key" \
     | grep -v "Attempt to write login records by non-root user (aborting)"
