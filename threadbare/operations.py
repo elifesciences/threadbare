@@ -1,11 +1,11 @@
-from functools import wraps
+from functools import wraps, partial
 from datetime import datetime
 import tempfile
 import contextlib
 import subprocess
 from threading import Timer
 import getpass
-from pssh import exceptions as pssh_exceptions
+import pssh.exceptions
 import os, sys
 from pssh.clients.native import SSHClient as PSSHClient
 import gevent
@@ -57,13 +57,13 @@ class NetworkError(BaseException):
         custom_error_prefixes = {
             # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
             # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
-            pssh_exceptions.Timeout: "Timed out trying to connect.",
+            pssh.exceptions.Timeout: "Timed out trying to connect.",
             # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
             # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
             # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
-            pssh_exceptions.SSHException: "Low level socket error connecting to host.",
-            pssh_exceptions.SessionError: "Low level socket error connecting to host.",
-            pssh_exceptions.ConnectionErrorException: "Low level socket error connecting to host.",
+            pssh.exceptions.SSHException: "Low level socket error connecting to host.",
+            pssh.exceptions.SessionError: "Low level socket error connecting to host.",
+            pssh.exceptions.ConnectionErrorException: "Low level socket error connecting to host.",
         }
         new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
         original_error = str(self.wrapped)
@@ -209,13 +209,19 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
 
     try:
         # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
-        channel, host_string, stdout, stderr, stdin = client.run_command(
+        # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/output.py
+        host_output = client.run_command(
             command, sudo, user, use_pty, shell, encoding, timeout
         )
 
+        channel = host_output.channel
+        host_string = host_output.host
+        stdout = host_output.stdout
+        stderr = host_output.stderr
+
         def get_exit_code():
-            client.wait_finished(channel)
-            return channel.get_exit_status()
+            client.wait_finished(host_output)
+            return host_output.exit_code
 
         return {
             # defer executing as it consumes output entirely before returning. this
@@ -274,7 +280,6 @@ def _print_line(output_pipe, line, **kwargs):
             except ValueError:  # "substring not found"
                 msg = "'display_prefix' option ignored: '{line}' not found in 'line_template' setting"
                 LOG.warning(msg)
-                pass
 
         output_pipe.write(template.format(**template_kwargs))
 
@@ -282,14 +287,14 @@ def _print_line(output_pipe, line, **kwargs):
         return line  # free of any formatting
 
 
-def _process_output(output_pipe, result_list, **kwargs):
+def _process_output(output_pipe, result_buffer, **kwargs):
     "calls `_print_line` on each result in `result_list`."
 
     # always process the results as soon as we have them
     # use `quiet=True` to hide the printing of output to stdout/stderr
     # use `discard_output=True` to discard the results as soon as they are read.
     # `stderr` results may be empty if `combine_stderr` in call to `remote` was `True`
-    new_results = [_print_line(output_pipe, line, **kwargs) for line in result_list]
+    new_results = [_print_line(output_pipe, line, **kwargs) for line in result_buffer]
     output_pipe.flush()
     if "discard_output" in kwargs and not kwargs["discard_output"]:
         return new_results
@@ -689,7 +694,7 @@ def rsync_download(remote_path, local_path, **kwargs):
 def _transfer_fn(client, direction, **kwargs):
     """returns the `client` object's appropriate transfer *method* given a `direction`.
     `direction` is either 'upload' or 'download'.
-    Also accepts the `transfer_protocol` keyword parameter that is either 'scp' (default) or 'sftp'."""
+    Also accepts the `transfer_protocol` keyword parameter that is either 'rsync' (default), 'scp' or 'sftp'."""
     base_kwargs = {
         "overwrite": True,
         # sftp is *exceptionally* slow.
@@ -714,7 +719,9 @@ def _transfer_fn(client, direction, **kwargs):
                 fn(local_file, remote_file)
             else:
                 # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
-                gevent.joinall(fn(local_file, remote_file), raise_error=True)
+                g = fn(local_file, remote_file)
+                if g:
+                    gevent.joinall(g, raise_error=True)
 
             # lsh@2020-04, local testing didn't reveal anything but small files uploaded via SCP SCP during CI
             # were either missing or had empty bodies. SFTP seemed to be fine.
@@ -740,14 +747,16 @@ def _transfer_fn(client, direction, **kwargs):
             if final_kwargs["transfer_protocol"] == "rsync":
                 fn(remote_file, local_file)
             else:
-                # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
-                gevent.joinall(fn(remote_file, local_file), raise_error=True)
+                # https://github.com/ParallelSSH/parallel-ssh/blob/d812ff32d828009ddb94f458fe43920c22df4c0e/pssh/clients/native/single.py#L558
+                g = fn(remote_file, local_file)
+                if g:
+                    gevent.joinall(g, raise_error=True)
 
         return wrapper
 
     upload_backends = {
-        "sftp": client.copy_file,
-        "scp": client.scp_send,
+        "sftp": partial(client.copy_file, recurse=True),
+        "scp": partial(client.scp_send, recurse=True),
         "rsync": rsync_upload,
     }
 
@@ -813,7 +822,7 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
         transfer_fn(remote_tempfile, local_path)
         return local_path
 
-    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+    except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
         raise NetworkError(exc)
 
@@ -868,7 +877,7 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
 
             try:
                 transfer_fn(remote_path, local_path)
-            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
                 # permissions or network issues may cause these
                 raise NetworkError(exc)
 
@@ -914,7 +923,7 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
             remote_file_exists(remote_path, use_sudo=True, **kwargs),
             "remote path does not exist: %s" % (remote_path),
         )
-    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+    except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
         raise NetworkError(exc)
 
@@ -963,6 +972,6 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
         try:
             transfer_fn = _transfer_fn(client, "upload", **kwargs)
             transfer_fn(local_path, remote_path)
-        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
             # permissions or network issues may cause these
             raise NetworkError(exc)
