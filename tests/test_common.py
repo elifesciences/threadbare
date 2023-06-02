@@ -66,8 +66,9 @@ def test__shell_escape_bad_cases():
         with pytest.raises(expected):
             common._shell_escape(given)
 
+
 def test_is_int():
-    true_cases = [1,2,3,4,5,-1,-2,-3,-4]
+    true_cases = [1, 2, 3, 4, 5, -1, -2, -3, -4]
     for case in true_cases:
         assert common.isint(case)
     false_cases = [None, "", [], {}]

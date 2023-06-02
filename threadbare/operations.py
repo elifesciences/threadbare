@@ -67,7 +67,7 @@ class NetworkError(BaseException):
             pssh.exceptions.ConnectionErrorException: "Low level socket error connecting to host.",
             ConnectionError: "Low level socket error connecting to host.",
             # lsh@2023-05-08: introduced in pssh 2.9.0, we have to capture this and retry it ourselves.
-            ConnectionRefusedError: "Low level socket error connecting to host."
+            ConnectionRefusedError: "Low level socket error connecting to host.",
         }
         new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
         original_error = str(self.wrapped)
@@ -218,7 +218,6 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
             command, sudo, user, use_pty, shell, encoding, timeout
         )
 
-        channel = host_output.channel
         host_string = host_output.host
         stdout = host_output.stdout
         stderr = host_output.stderr
