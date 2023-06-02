@@ -11,8 +11,15 @@ rm -rf venv/
 . install.sh -dev
 
 ./tests-remote/sshd-server.sh &
-sleep 1 # it's possible to hit pytest before sshd-server has finished
 pid=$!
+
+# it's possible to hit pytest before sshd-server has finished.
+# ensure sshd is available before starting tests.
+while true; do
+    sleep 1
+    test -f "/tmp/sshd-dummy/.ssh/dummy_user_key" && break
+    echo "waiting for sshd-server to become available ..."
+done
 
 echo "pid:$pid"
 function finish {
@@ -38,12 +45,12 @@ source venv/bin/activate
 # no further args passed to test script
 # run with coverage and reporting enabled
 for transfer_protocol in "scp" "sftp" "rsync"; do
-echo "---------- testing with $transfer_protocol"
-THREADBARE_TEST_TRANSFER_PROTOCOL="$transfer_protocol" PYTHONPATH=threadbare/ \
-    python -m pytest \
-        example.py tests/ \
-        -vv \
-        --cov=threadbare/ \
-        --cov-report html --cov-report term \
-        --cov-fail-under 93
+    echo "---------- testing with $transfer_protocol"
+    THREADBARE_TEST_TRANSFER_PROTOCOL="$transfer_protocol" PYTHONPATH=threadbare/ \
+        python -m pytest \
+            example.py tests/ \
+            -vv \
+            --cov=threadbare/ \
+            --cov-report html --cov-report term \
+            --cov-fail-under 93
 done
