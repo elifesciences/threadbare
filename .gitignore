@@ -2,10 +2,8 @@
 *~
 *.orig
 *.log
-.tox/
 venv/
 threadbare.egg-info/
-.tox/
 .coverage
 htmlcov/
 dist/
