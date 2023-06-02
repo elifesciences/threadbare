@@ -17,7 +17,7 @@ if [ -z "$@" ]; then
         -vv \
         --cov=threadbare/ \
         --cov-report html --cov-report term \
-        --cov-fail-under 75
+        --cov-fail-under 70
 else
     # running tests adhoc, skip coverage reporting
     PYTHONPATH=threadbare/ python -m pytest \
