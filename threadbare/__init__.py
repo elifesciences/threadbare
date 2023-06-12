@@ -10,8 +10,8 @@ monkey.patch_all()
 import os  # NOQA: E402
 
 if os.path.exists("README.md"):
-    data = open("README.md").read()
-    __doc__ = str(data)
+    with open("README.md") as fh:
+        __doc__ = str(fh.read())
 
 from . import state, operations, execute  # NOQA: E402
 

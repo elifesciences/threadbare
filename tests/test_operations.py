@@ -1,12 +1,9 @@
-# This Python file uses the following encoding: utf-8
-
 import unittest.mock as mock
 from unittest.mock import patch
 from io import StringIO
 import pytest
 from threadbare import operations, state
 from threadbare.common import merge, cwd, PromptedException
-from pssh import exceptions as pssh_exceptions
 
 # remote
 
@@ -236,6 +233,8 @@ def test_remote_non_default_args():
 
 
 def test_remote_command_exception():
+    """exceptions from nested parallel-ssh `client` are passed through.
+    previously they were caught and wrapped in an `operations.NetworkError`."""
     kwargs = {
         "host_string": HOST,
         "port": PORT,
@@ -244,28 +243,10 @@ def test_remote_command_exception():
         "command": "echo hello",
     }
     m = mock.MagicMock()
-    m.run_command = mock.Mock(side_effect=ValueError("earthshatteringkaboom"))
+    m.run_command = mock.Mock(side_effect=ConnectionRefusedError("whom?"))
     with patch("threadbare.operations.SSHClient", return_value=m):
-        with pytest.raises(operations.NetworkError):
+        with pytest.raises(ConnectionRefusedError):
             operations.remote(**kwargs)
-
-
-def test_remote_command_timeout_exception():
-    kwargs = {
-        "host_string": HOST,
-        "port": PORT,
-        "user": USER,
-        "key_filename": PEM,
-        "command": "echo hello",
-    }
-    m = mock.MagicMock()
-    m.run_command = mock.Mock(side_effect=pssh_exceptions.Timeout("foobar"))
-    with patch("threadbare.operations.SSHClient", return_value=m):
-        with pytest.raises(operations.NetworkError) as err:
-            operations.remote(**kwargs)
-        err = err.value
-        assert type(err.wrapped) == pssh_exceptions.Timeout
-        assert str(err) == "Timed out trying to connect. foobar"
 
 
 # local
