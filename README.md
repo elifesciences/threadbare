@@ -37,6 +37,8 @@ with settings(host_string='my.server', warn_only=True):
     remote("echo 'hello world!'")
 ```
 
+See [example.py](./example.py) for more.
+
 ## local tests
 
 Run the [test suite](./test.sh) with `./test.sh`
@@ -140,3 +142,8 @@ mechanism for manipulating global state.
 * child processes cannot prompt for input. They have no access to stdin.
 * child processes may die or throw exceptions that can't be properly handled in the parent
 
+## Licence
+
+Copyright © 2019-2023 eLife Sciences
+
+Distributed under the GNU Affero General Public Licence, version 3.
