@@ -886,7 +886,8 @@ def test_wrapped_exceptions_during_transfer():
                     upload(local_file_name, remote_file_name)
                     if TRANSFER_PROTOCOL in ["scp", "sftp"]:
                         assert isinstance(exc, operations.WrappedNetworkException)
+                        assert exc.wrapped
                     else:
                         assert not isinstance(exc, operations.WrappedNetworkException)
                         assert isinstance(exc, operations.NetworkException)
-                        assert TRANSFER_PROTOCOL == 'rsync'
+                        assert TRANSFER_PROTOCOL == "rsync"

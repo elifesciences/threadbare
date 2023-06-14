@@ -1,3 +1,5 @@
+# This Python file uses the following encoding: utf-8
+
 import unittest.mock as mock
 from unittest.mock import patch
 from io import StringIO
@@ -233,7 +235,7 @@ def test_remote_non_default_args():
 
 
 def test_remote_command_exception():
-    """exceptions from nested parallel-ssh `client` are passed through.
+    """exceptions from the parallel-ssh client are passed through.
     previously they were caught and wrapped in an `operations.NetworkError`."""
     kwargs = {
         "host_string": HOST,
