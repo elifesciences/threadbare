@@ -24,14 +24,14 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from functools import wraps
+<pre><code class="python">from functools import wraps, partial
 from datetime import datetime
 import tempfile
 import contextlib
 import subprocess
 from threading import Timer
 import getpass
-from pssh import exceptions as pssh_exceptions
+import pssh.exceptions
 import os, sys
 from pssh.clients.native import SSHClient as PSSHClient
 import gevent
@@ -62,38 +62,16 @@ class SSHClient(PSSHClient):
         return self
 
 
-class NetworkError(BaseException):
-    &#34;&#34;&#34;generic &#39;died while doing something ssh-related&#39; catch-all exception class.
-    calling str() on this exception will return the results of calling str() on the
-    wrapped exception.&#34;&#34;&#34;
+class NetworkError(Exception):
+    &#34;generic &#39;died while doing something network-related&#39; catch-all exception class.&#34;
+    pass
 
-    def __init__(self, wrapped_exception_inst):
-        self.wrapped = wrapped_exception_inst
 
-    def __str__(self):
-        # for cases where we want the convenient:
-        #   `raise NetworkError(&#34;some network problem&#34;)`
-        if isinstance(self.wrapped, str):
-            return self.wrapped
+class WrappedNetworkError(NetworkError):
+    &#34;groups several exceptions into a single WrappedNetworkError&#34;
 
-        # we have the opportunity here to tweak the error messages to make them
-        # similar to their equivalents in Fabric.
-        # original error messages are still available via `str(excinst.wrapped)`
-        space = &#34; &#34;
-        custom_error_prefixes = {
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
-            pssh_exceptions.Timeout: &#34;Timed out trying to connect.&#34;,
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
-            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
-            pssh_exceptions.SSHException: &#34;Low level socket error connecting to host.&#34;,
-            pssh_exceptions.SessionError: &#34;Low level socket error connecting to host.&#34;,
-            pssh_exceptions.ConnectionErrorException: &#34;Low level socket error connecting to host.&#34;,
-        }
-        new_error = custom_error_prefixes.get(type(self.wrapped)) or &#34;&#34;
-        original_error = str(self.wrapped)
-        return new_error + space + original_error
+    def __init__(self, exc):
+        self.wrapped = exc
 
 
 def pem_key():
@@ -233,28 +211,28 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
     user = None  # user to sudo to
     encoding = &#34;utf-8&#34;  # used everywhere
 
-    try:
-        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
-        channel, host_string, stdout, stderr, stdin = client.run_command(
-            command, sudo, user, use_pty, shell, encoding, timeout
-        )
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
+    # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/output.py
+    host_output = client.run_command(
+        command, sudo, user, use_pty, shell, encoding, timeout
+    )
 
-        def get_exit_code():
-            client.wait_finished(channel)
-            return channel.get_exit_status()
+    host_string = host_output.host
+    stdout = host_output.stdout
+    stderr = host_output.stderr
 
-        return {
-            # defer executing as it consumes output entirely before returning. this
-            # removes our chance to display/transform output as it is streamed to us
-            &#34;return_code&#34;: get_exit_code,
-            &#34;command&#34;: command,
-            &#34;stdout&#34;: stdout,
-            &#34;stderr&#34;: stderr,
-        }
-    except BaseException as ex:
-        # *probably* a network error:
-        # - https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
-        raise NetworkError(ex)
+    def get_exit_code():
+        client.wait_finished(host_output)
+        return host_output.exit_code
+
+    return {
+        # defer executing as it consumes output entirely before returning. this
+        # removes our chance to display/transform output as it is streamed to us
+        &#34;return_code&#34;: get_exit_code,
+        &#34;command&#34;: command,
+        &#34;stdout&#34;: stdout,
+        &#34;stderr&#34;: stderr,
+    }
 
 
 def _print_line(output_pipe, line, **kwargs):
@@ -300,7 +278,6 @@ def _print_line(output_pipe, line, **kwargs):
             except ValueError:  # &#34;substring not found&#34;
                 msg = &#34;&#39;display_prefix&#39; option ignored: &#39;{line}&#39; not found in &#39;line_template&#39; setting&#34;
                 LOG.warning(msg)
-                pass
 
         output_pipe.write(template.format(**template_kwargs))
 
@@ -308,14 +285,14 @@ def _print_line(output_pipe, line, **kwargs):
         return line  # free of any formatting
 
 
-def _process_output(output_pipe, result_list, **kwargs):
+def _process_output(output_pipe, result_buffer, **kwargs):
     &#34;calls `_print_line` on each result in `result_list`.&#34;
 
     # always process the results as soon as we have them
     # use `quiet=True` to hide the printing of output to stdout/stderr
     # use `discard_output=True` to discard the results as soon as they are read.
     # `stderr` results may be empty if `combine_stderr` in call to `remote` was `True`
-    new_results = [_print_line(output_pipe, line, **kwargs) for line in result_list]
+    new_results = [_print_line(output_pipe, line, **kwargs) for line in result_buffer]
     output_pipe.flush()
     if &#34;discard_output&#34; in kwargs and not kwargs[&#34;discard_output&#34;]:
         return new_results
@@ -715,7 +692,7 @@ def rsync_download(remote_path, local_path, **kwargs):
 def _transfer_fn(client, direction, **kwargs):
     &#34;&#34;&#34;returns the `client` object&#39;s appropriate transfer *method* given a `direction`.
     `direction` is either &#39;upload&#39; or &#39;download&#39;.
-    Also accepts the `transfer_protocol` keyword parameter that is either &#39;scp&#39; (default) or &#39;sftp&#39;.&#34;&#34;&#34;
+    Also accepts the `transfer_protocol` keyword parameter that is either &#39;rsync&#39; (default), &#39;scp&#39; or &#39;sftp&#39;.&#34;&#34;&#34;
     base_kwargs = {
         &#34;overwrite&#34;: True,
         # sftp is *exceptionally* slow.
@@ -740,7 +717,9 @@ def _transfer_fn(client, direction, **kwargs):
                 fn(local_file, remote_file)
             else:
                 # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L524
-                gevent.joinall(fn(local_file, remote_file), raise_error=True)
+                g = fn(local_file, remote_file)
+                if g:
+                    gevent.joinall(g, raise_error=True)
 
             # lsh@2020-04, local testing didn&#39;t reveal anything but small files uploaded via SCP SCP during CI
             # were either missing or had empty bodies. SFTP seemed to be fine.
@@ -766,14 +745,16 @@ def _transfer_fn(client, direction, **kwargs):
             if final_kwargs[&#34;transfer_protocol&#34;] == &#34;rsync&#34;:
                 fn(remote_file, local_file)
             else:
-                # https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L560
-                gevent.joinall(fn(remote_file, local_file), raise_error=True)
+                # https://github.com/ParallelSSH/parallel-ssh/blob/d812ff32d828009ddb94f458fe43920c22df4c0e/pssh/clients/native/single.py#L558
+                g = fn(remote_file, local_file)
+                if g:
+                    gevent.joinall(g, raise_error=True)
 
         return wrapper
 
     upload_backends = {
-        &#34;sftp&#34;: client.copy_file,
-        &#34;scp&#34;: client.scp_send,
+        &#34;sftp&#34;: partial(client.copy_file, recurse=True),
+        &#34;scp&#34;: partial(client.scp_send, recurse=True),
         &#34;rsync&#34;: rsync_upload,
     }
 
@@ -839,9 +820,9 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
         transfer_fn(remote_tempfile, local_path)
         return local_path
 
-    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+    except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
-        raise NetworkError(exc)
+        raise WrappedNetworkError(exc)
 
     finally:
         remote_sudo(&#39;rm -f &#34;%s&#34;&#39; % remote_tempfile, **kwargs)
@@ -894,13 +875,14 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
 
             try:
                 transfer_fn(remote_path, local_path)
-            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
                 # permissions or network issues may cause these
-                raise NetworkError(exc)
+                raise WrappedNetworkError(exc)
 
         if temp_file:
             flags = &#34;r&#34; if isinstance(data_buffer, io.StringIO) else &#34;rb&#34;
-            data = open(local_path, flags).read()
+            with open(local_path, flags) as fh:
+                data = fh.read()
             data_buffer.write(data)
             # deletes the *temporary file*. `temp_file` is a file descriptor
             os.unlink(local_path)
@@ -940,9 +922,9 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
             remote_file_exists(remote_path, use_sudo=True, **kwargs),
             &#34;remote path does not exist: %s&#34; % (remote_path),
         )
-    except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+    except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
-        raise NetworkError(exc)
+        raise WrappedNetworkError(exc)
 
 
 def _write_bytes_to_temporary_file(local_path):
@@ -989,9 +971,9 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
         try:
             transfer_fn = _transfer_fn(client, &#34;upload&#34;, **kwargs)
             transfer_fn(local_path, remote_path)
-        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
             # permissions or network issues may cause these
-            raise NetworkError(exc)</code></pre>
+            raise WrappedNetworkError(exc)</code></pre>
 </details>
 </section>
 <section>
@@ -1101,13 +1083,14 @@ avoid <code>use_sudo</code> if at all possible</p></section>
 
             try:
                 transfer_fn(remote_path, local_path)
-            except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+            except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
                 # permissions or network issues may cause these
-                raise NetworkError(exc)
+                raise WrappedNetworkError(exc)
 
         if temp_file:
             flags = &#34;r&#34; if isinstance(data_buffer, io.StringIO) else &#34;rb&#34;
-            data = open(local_path, flags).read()
+            with open(local_path, flags) as fh:
+                data = fh.read()
             data_buffer.write(data)
             # deletes the *temporary file*. `temp_file` is a file descriptor
             os.unlink(local_path)
@@ -1643,9 +1626,9 @@ def rcd(remote_working_dir):
         try:
             transfer_fn = _transfer_fn(client, &#34;upload&#34;, **kwargs)
             transfer_fn(local_path, remote_path)
-        except (pssh_exceptions.SFTPError, pssh_exceptions.SCPError) as exc:
+        except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
             # permissions or network issues may cause these
-            raise NetworkError(exc)</code></pre>
+            raise WrappedNetworkError(exc)</code></pre>
 </details>
 </dd>
 </dl>
@@ -1655,57 +1638,31 @@ def rcd(remote_working_dir):
 <dl>
 <dt id="threadbare.operations.NetworkError"><code class="flex name class">
 <span>class <span class="ident">NetworkError</span></span>
-<span>(</span><span>wrapped_exception_inst)</span>
+<span>(</span><span>*args, **kwargs)</span>
 </code></dt>
 <dd>
-<section class="desc"><p>generic 'died while doing something ssh-related' catch-all exception class.
-calling str() on this exception will return the results of calling str() on the
-wrapped exception.</p></section>
+<section class="desc"><p>generic 'died while doing something network-related' catch-all exception class.</p></section>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class NetworkError(BaseException):
-    &#34;&#34;&#34;generic &#39;died while doing something ssh-related&#39; catch-all exception class.
-    calling str() on this exception will return the results of calling str() on the
-    wrapped exception.&#34;&#34;&#34;
-
-    def __init__(self, wrapped_exception_inst):
-        self.wrapped = wrapped_exception_inst
-
-    def __str__(self):
-        # for cases where we want the convenient:
-        #   `raise NetworkError(&#34;some network problem&#34;)`
-        if isinstance(self.wrapped, str):
-            return self.wrapped
-
-        # we have the opportunity here to tweak the error messages to make them
-        # similar to their equivalents in Fabric.
-        # original error messages are still available via `str(excinst.wrapped)`
-        space = &#34; &#34;
-        custom_error_prefixes = {
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
-            pssh_exceptions.Timeout: &#34;Timed out trying to connect.&#34;,
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
-            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
-            pssh_exceptions.SSHException: &#34;Low level socket error connecting to host.&#34;,
-            pssh_exceptions.SessionError: &#34;Low level socket error connecting to host.&#34;,
-            pssh_exceptions.ConnectionErrorException: &#34;Low level socket error connecting to host.&#34;,
-        }
-        new_error = custom_error_prefixes.get(type(self.wrapped)) or &#34;&#34;
-        original_error = str(self.wrapped)
-        return new_error + space + original_error</code></pre>
+<pre><code class="python">class NetworkError(Exception):
+    &#34;generic &#39;died while doing something network-related&#39; catch-all exception class.&#34;
+    pass</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li>builtins.Exception</li>
 <li>builtins.BaseException</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="threadbare.operations.WrappedNetworkError" href="#threadbare.operations.WrappedNetworkError">WrappedNetworkError</a></li>
 </ul>
 </dd>
 <dt id="threadbare.operations.SSHClient"><code class="flex name class">
 <span>class <span class="ident">SSHClient</span></span>
-<span>(</span><span>host, user=None, password=None, port=None, pkey=None, num_retries=3, retry_delay=5, allow_agent=True, timeout=None, forward_ssh_agent=False, proxy_host=None, keepalive_seconds=60)</span>
+<span>(</span><span>host, user=None, password=None, port=None, pkey=None, alias=None, num_retries=3, retry_delay=5, allow_agent=True, timeout=None, forward_ssh_agent=False, proxy_host=None, proxy_port=None, proxy_pkey=None, proxy_user=None, proxy_password=None, keepalive_seconds=60, identity_auth=True, ipv6_only=False)</span>
 </code></dt>
 <dd>
 <section class="desc"><p>ssh2-python (libssh2) based non-blocking SSH client.</p>
@@ -1715,33 +1672,44 @@ wrapped exception.</p></section>
 :type user: str
 :param password: Password to use for password authentication.
 :type password: str
+:param alias: Use an alias for this host.
+:type alias: str
 :param port: SSH port to connect to. Defaults to SSH default (22)
 :type port: int
 :param pkey: Private key file path to use for authentication. Path must
 be either absolute path or relative to user home directory
 like <code>~/&lt;path&gt;</code>.
-:type pkey: str
+Bytes type input is used as private key data for authentication.
+:type pkey: str or bytes
 :param num_retries: (Optional) Number of connection and authentication
 attempts before the client gives up. Defaults to 3.
 :type num_retries: int
 :param retry_delay: Number of seconds to wait between retries. Defaults
 to :py:class:<code>pssh.constants.RETRY_DELAY</code>
-:type retry_delay: int
+:type retry_delay: int or float
 :param timeout: SSH session timeout setting in seconds. This controls
 timeout setting of authenticated SSH sessions.
-:type timeout: int
+:type timeout: int or float
 :param allow_agent: (Optional) set to False to disable connecting to
 the system's SSH agent
 :type allow_agent: bool
-:param forward_ssh_agent: (Optional) Turn on SSH agent forwarding -
-equivalent to <code>ssh -A</code> from the <code>ssh</code> command line utility.
-Defaults to True if not set.
+:param identity_auth: (Optional) set to False to disable attempting to
+authenticate with default identity files from
+<code>pssh.clients.base.single.BaseSSHClient.IDENTITIES</code>
+:type identity_auth: bool
+:param forward_ssh_agent: Unused - agent forwarding not implemented.
 :type forward_ssh_agent: bool
-:param proxy_host: Connection to host is via provided proxy host
-and client should use self.proxy_host for connection attempts.
+:param proxy_host: Connect to target host via given proxy host.
 :type proxy_host: str
+:param proxy_port: Port to use for proxy connection. Defaults to self.port
+:type proxy_port: int
 :param keepalive_seconds: Interval of keep alive messages being sent to
-server. Set to <code>0</code> or <code>False</code> to disable.</p>
+server. Set to <code>0</code> or <code>False</code> to disable.
+:type keepalive_seconds: int
+:param ipv6_only: Choose IPv6 addresses only if multiple are available
+for the host or raise NoIPv6AddressFoundError otherwise. Note this will
+disable connecting to an IPv4 address if an IP address is provided instead.
+:type ipv6_only: bool</p>
 <p>:raises: :py:class:<code>pssh.exceptions.PKeyFileError</code> on errors finding
 provided private key.</p></section>
 <details class="source">
@@ -1758,6 +1726,30 @@ provided private key.</p></section>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>pssh.clients.native.single.SSHClient</li>
+<li>pssh.clients.base.single.BaseSSHClient</li>
+</ul>
+</dd>
+<dt id="threadbare.operations.WrappedNetworkError"><code class="flex name class">
+<span>class <span class="ident">WrappedNetworkError</span></span>
+<span>(</span><span>exc)</span>
+</code></dt>
+<dd>
+<section class="desc"><p>groups several exceptions into a single WrappedNetworkError</p></section>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class WrappedNetworkError(NetworkError):
+    &#34;groups several exceptions into a single WrappedNetworkError&#34;
+
+    def __init__(self, exc):
+        self.wrapped = exc</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="threadbare.operations.NetworkError" href="#threadbare.operations.NetworkError">NetworkError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
 </ul>
 </dd>
 </dl>
@@ -1802,6 +1794,9 @@ provided private key.</p></section>
 </li>
 <li>
 <h4><code><a title="threadbare.operations.SSHClient" href="#threadbare.operations.SSHClient">SSHClient</a></code></h4>
+</li>
+<li>
+<h4><code><a title="threadbare.operations.WrappedNetworkError" href="#threadbare.operations.WrappedNetworkError">WrappedNetworkError</a></code></h4>
 </li>
 </ul>
 </li>

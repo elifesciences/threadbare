@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. This change
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 4.0.0 - 2023-06-14
+
+### Changed
+
+* licence changed from GPLv3 to AGPLv3
+
+### Removed
+
+* network exceptions are no longer caught and wrapped in `operations.NetworkException`.
+    - the exceptions raised by `parallel-ssh` are now allowed to pass through.
+        - *except* SCP/SFTP/RSync exceptions, which are still instances of `operations.NetworkException`.
+
 ## 3.1.0 - 2023-06-06
 
 ### Added

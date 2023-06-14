@@ -46,7 +46,7 @@ with settings(host_string='my.server', warn_only=True):
 </code></pre>
 <h2 id="local-tests">local tests</h2>
 <p>Run the <a href="./test.sh">test suite</a> with <code>./test.sh</code></p>
-<p>Individual tests can be run with <code>./test.sh -k test_fn_name</code></p>
+<p>Individual tests can be run with <code>./test.sh example.py::test_fn_name</code></p>
 <h2 id="remote-tests">remote tests</h2>
 <p>A set of tests that also serve as working examples of threadbare's functionality can be executed by starting a dummy SSH
 server:</p>
@@ -131,8 +131,8 @@ monkey.patch_all()
 import os  # NOQA: E402
 
 if os.path.exists(&#34;README.md&#34;):
-    data = open(&#34;README.md&#34;).read()
-    __doc__ = str(data)
+    with open(&#34;README.md&#34;) as fh:
+        __doc__ = str(fh.read())
 
 from . import state, operations, execute  # NOQA: E402
 
