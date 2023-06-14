@@ -435,13 +435,15 @@ def _test_upload_and_download_a_file(transfer_protocol):
                 new_local_file_name = join(local_env["temp-dir"], "foobarbaz")
                 download(remote_file_name, new_local_file_name)
                 # verify contents
-                assert open(new_local_file_name, "r").read() == "foobar"
+                with open(new_local_file_name, "r") as fh:
+                    assert fh.read() == "foobar"
 
                 LOG.debug("modifying local file (again) ...")
                 local('printf "baz" >> %s' % new_local_file_name)
 
                 LOG.debug("testing local file ...")
-                data = open(new_local_file_name, "r").read()
+                with open(new_local_file_name, "r") as fh:
+                    data = fh.read()
                 assert "foobarbaz" == data
 
 
@@ -524,7 +526,8 @@ def test_download_to_extant_local_file():
                 assert remote_file_exists(remote_file)
 
                 download(remote_file, local_file)
-                result = open(local_file, "r").read()
+                with open(local_file, "r") as fh:
+                    result = fh.read()
                 assert payload == result
 
 
@@ -645,7 +648,8 @@ def test_download_file_owned_by_root():
                 # download remote root-only file as regular user
                 download(remote_file_name, local_file_name, use_sudo=True)
                 assert os.path.exists(local_file_name)
-                assert file_contents == open(local_file_name, "r").read()
+                with open(local_file_name, "r") as fh:
+                    assert file_contents == fh.read()
 
 
 def test_upload_file_to_root_dir():
@@ -821,11 +825,12 @@ def test_run_script():
         with empty_remote_fixture() as remote_env:
             with _test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
-                open(local_script, "w").write(
-                    r"""#!/bin/bash
+                with open(local_script, "w") as fh:
+                    fh.write(
+                        r"""#!/bin/bash
 echo "hello, world"
 """
-                )
+                    )
                 remote_script = join(remote_env["temp-dir"], "script.sh")
                 upload(local_script, remote_script)
                 remote("chmod +x %s" % remote_script)
@@ -841,11 +846,12 @@ def test_run_script_parallel():
         with empty_remote_fixture() as remote_env:
             with _test_settings():
                 local_script = join(local_env["temp-dir"], "script.sh")
-                open(local_script, "w").write(
-                    r"""#!/bin/bash
+                with open(local_script, "w") as fh:
+                    fh.write(
+                        r"""#!/bin/bash
 echo "hello, world"
 """
-                )
+                    )
                 remote_script = join(remote_env["temp-dir"], "script.sh")
 
                 @execute.parallel
@@ -857,3 +863,31 @@ echo "hello, world"
 
                 results = execute.execute_with_hosts(workerfn, hosts=["127.0.0.1"])
                 assert ["hello, world"] == results[HOST]["stdout"]
+
+
+def test_wrapped_exceptions_during_transfer():
+    """SCP and SFTP exceptions during transfer are caught and wrapped as an `operations.WrappedNetworkException`.
+    rsync has no equivalent so a regular `operations.NetworkException` is thrown.
+    this test suite (example.py) is run using all supported protocols, scp, sftp and rsync.
+    in two cases we will have a wrapped exception and in one we will have a regular exception.
+    """
+    with local_fixture() as local_env:
+        with empty_remote_fixture() as remote_env:
+            with _test_settings():
+                remote_sudo('chown root:root -R "%s"' % remote_env["temp-dir"])
+
+                local_file_name = local_env["temp-files"]["small-file"]
+                remote_file_name = join(
+                    remote_env["temp-dir"], basename(local_file_name)
+                )
+
+                # upload file to root-owned directory
+                with pytest.raises(operations.NetworkError) as exc:
+                    upload(local_file_name, remote_file_name)
+                    if TRANSFER_PROTOCOL in ["scp", "sftp"]:
+                        assert isinstance(exc, operations.WrappedNetworkException)
+                        assert exc.wrapped
+                    else:
+                        assert not isinstance(exc, operations.WrappedNetworkException)
+                        assert isinstance(exc, operations.NetworkException)
+                        assert TRANSFER_PROTOCOL == "rsync"

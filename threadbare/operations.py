@@ -36,42 +36,16 @@ class SSHClient(PSSHClient):
         return self
 
 
-class NetworkError(BaseException):
-    """generic 'died while doing something ssh-related' catch-all exception class.
-    calling str() on this exception will return the results of calling str() on the
-    wrapped exception."""
+class NetworkError(Exception):
+    "generic 'died while doing something network-related' catch-all exception class."
+    pass
 
-    def __init__(self, wrapped_exception_inst):
-        self.wrapped = wrapped_exception_inst
 
-    def __str__(self):
-        # for cases where we want the convenient:
-        #   `raise NetworkError("some network problem")`
-        if isinstance(self.wrapped, str):
-            return self.wrapped
+class WrappedNetworkError(NetworkError):
+    "groups several exceptions into a single WrappedNetworkError"
 
-        # we have the opportunity here to tweak the error messages to make them
-        # similar to their equivalents in Fabric.
-        # original error messages are still available via `str(excinst.wrapped)`
-        space = " "
-        custom_error_prefixes = {
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L345-L347
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/8b7bb4bcb94d913c3b7da77db592f84486c53b90/pssh/clients/native/parallel.py#L272-L274
-            pssh.exceptions.Timeout: "Timed out trying to connect.",
-            # builder: https://github.com/elifesciences/builder/blob/master/src/buildercore/core.py#L348-L350
-            # fabric: https://github.com/mathiasertl/fabric/blob/master/fabric/network.py#L601-L605
-            # pssh: https://github.com/ParallelSSH/parallel-ssh/blob/2e9668cf4b58b38316b1d515810d7e6c595c76f3/pssh/exceptions.py
-            pssh.exceptions.SSHException: "Low level socket error connecting to host.",
-            pssh.exceptions.SessionError: "Low level socket error connecting to host.",
-            # lsh@2023-05-08: changed in pssh 2.9.0 and deprecated, pssh uses the builtin now.
-            pssh.exceptions.ConnectionErrorException: "Low level socket error connecting to host.",
-            ConnectionError: "Low level socket error connecting to host.",
-            # lsh@2023-05-08: introduced in pssh 2.9.0, we have to capture this and retry it ourselves.
-            ConnectionRefusedError: "Low level socket error connecting to host.",
-        }
-        new_error = custom_error_prefixes.get(type(self.wrapped)) or ""
-        original_error = str(self.wrapped)
-        return new_error + space + original_error
+    def __init__(self, exc):
+        self.wrapped = exc
 
 
 def pem_key():
@@ -211,33 +185,28 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
     user = None  # user to sudo to
     encoding = "utf-8"  # used everywhere
 
-    try:
-        # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
-        # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/output.py
-        host_output = client.run_command(
-            command, sudo, user, use_pty, shell, encoding, timeout
-        )
+    # https://parallel-ssh.readthedocs.io/en/latest/native_single.html#pssh.clients.native.single.SSHClient.run_command
+    # https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/output.py
+    host_output = client.run_command(
+        command, sudo, user, use_pty, shell, encoding, timeout
+    )
 
-        host_string = host_output.host
-        stdout = host_output.stdout
-        stderr = host_output.stderr
+    host_string = host_output.host
+    stdout = host_output.stdout
+    stderr = host_output.stderr
 
-        def get_exit_code():
-            client.wait_finished(host_output)
-            return host_output.exit_code
+    def get_exit_code():
+        client.wait_finished(host_output)
+        return host_output.exit_code
 
-        return {
-            # defer executing as it consumes output entirely before returning. this
-            # removes our chance to display/transform output as it is streamed to us
-            "return_code": get_exit_code,
-            "command": command,
-            "stdout": stdout,
-            "stderr": stderr,
-        }
-    except BaseException as ex:
-        # *probably* a network error:
-        # - https://github.com/ParallelSSH/parallel-ssh/blob/master/pssh/exceptions.py
-        raise NetworkError(ex)
+    return {
+        # defer executing as it consumes output entirely before returning. this
+        # removes our chance to display/transform output as it is streamed to us
+        "return_code": get_exit_code,
+        "command": command,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
 
 
 def _print_line(output_pipe, line, **kwargs):
@@ -279,7 +248,7 @@ def _print_line(output_pipe, line, **kwargs):
 
         if not final_kwargs["display_prefix"]:
             try:
-                template = template[template.index("{line}"):]
+                template = template[template.index("{line}") :]
             except ValueError:  # "substring not found"
                 msg = "'display_prefix' option ignored: '{line}' not found in 'line_template' setting"
                 LOG.warning(msg)
@@ -827,7 +796,7 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
 
     except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
-        raise NetworkError(exc)
+        raise WrappedNetworkError(exc)
 
     finally:
         remote_sudo('rm -f "%s"' % remote_tempfile, **kwargs)
@@ -882,11 +851,12 @@ def download(remote_path, local_path, use_sudo=False, **kwargs):
                 transfer_fn(remote_path, local_path)
             except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
                 # permissions or network issues may cause these
-                raise NetworkError(exc)
+                raise WrappedNetworkError(exc)
 
         if temp_file:
             flags = "r" if isinstance(data_buffer, io.StringIO) else "rb"
-            data = open(local_path, flags).read()
+            with open(local_path, flags) as fh:
+                data = fh.read()
             data_buffer.write(data)
             # deletes the *temporary file*. `temp_file` is a file descriptor
             os.unlink(local_path)
@@ -928,7 +898,7 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
         )
     except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
         # permissions or network issues may cause these
-        raise NetworkError(exc)
+        raise WrappedNetworkError(exc)
 
 
 def _write_bytes_to_temporary_file(local_path):
@@ -977,4 +947,4 @@ def upload(local_path, remote_path, use_sudo=False, **kwargs):
             transfer_fn(local_path, remote_path)
         except (pssh.exceptions.SFTPError, pssh.exceptions.SCPError) as exc:
             # permissions or network issues may cause these
-            raise NetworkError(exc)
+            raise WrappedNetworkError(exc)
