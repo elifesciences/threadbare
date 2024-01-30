@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='threadbare',
-    version='4.0.0',
+    version='4.1.0',
     description='A Fabric and Paramiko replacement library',
     long_description="A partial replacement of the Fabric and Paramiko libraries using ParallelSSH.",
     long_description_content_type="text/markdown",
