@@ -613,16 +613,32 @@ def _rsync_upload(local_path, remote_path, **kwargs):
         _ssh_default_settings(), ["user", "host_string", "key_filename", "port"]
     )
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
+    host_string = final_kwargs["host_string"]
+    ip = 4
+    if ":" in host_string:
+        ip = 6
 
-    cmd = [
-        "rsync",
-        # '-i' is 'identity file'
-        # note: without 'StrictHostKeyChecking' we'll be given a prompt during testing. is this solvable?
-        "--rsh='ssh -i %s -p %s -o StrictHostKeyChecking=no'"
-        % (final_kwargs["key_filename"], final_kwargs["port"]),
-        local_path,
-        "%s@%s:%s" % (final_kwargs["user"], final_kwargs["host_string"], remote_path),
-    ]
+    if ip == 4:
+        cmd = [
+            "rsync",
+            # '-i' is 'identity file'
+            # note: without 'StrictHostKeyChecking' we'll be given a prompt during testing. is this solvable?
+            "--rsh='ssh -i %s -p %s -o StrictHostKeyChecking=no'"
+            % (final_kwargs["key_filename"], final_kwargs["port"]),
+            local_path,
+            "'%s@%s':%s" % (final_kwargs["user"], host_string, remote_path),
+        ]
+    else:
+        host_string = "[%s]" % host_string
+        cmd = [
+            "rsync",
+            "--ipv6",
+            "--rsh='ssh -6 -i %s -p %s -o StrictHostKeyChecking=no'"
+            % (final_kwargs["key_filename"], final_kwargs["port"]),
+            local_path,
+            "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
+        ]
+
     return " ".join(cmd)
 
 
@@ -641,15 +657,32 @@ def _rsync_download(remote_path, local_path, **kwargs):
         _ssh_default_settings(), ["user", "host_string", "key_filename", "port"]
     )
     global_kwargs, user_kwargs, final_kwargs = handle(base_kwargs, kwargs)
-    cmd = [
-        "rsync",
-        # '-i' is 'identity file'
-        # without 'StrictHostKeyChecking' we'll be given a prompt during testing.
-        "--rsh='ssh -i %s -p %s -o StrictHostKeyChecking=no'"
-        % (final_kwargs["key_filename"], final_kwargs["port"]),
-        "%s@%s:%s" % (final_kwargs["user"], final_kwargs["host_string"], remote_path),
-        local_path,
-    ]
+    host_string = final_kwargs["host_string"]
+    ip = 4
+    if ":" in host_string:
+        ip = 6
+
+    if ip == 4:
+        cmd = [
+            "rsync",
+            # '-i' is 'identity file'
+            # without 'StrictHostKeyChecking' we'll be given a prompt during testing.
+            "--rsh='ssh -i %s -p %s -o StrictHostKeyChecking=no'"
+            % (final_kwargs["key_filename"], final_kwargs["port"]),
+            "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
+            local_path,
+        ]
+    else:
+        host_string = "[%s]" % host_string
+        cmd = [
+            "rsync",
+            "--ipv6",
+            "--rsh='ssh -6 -i %s -p %s -o StrictHostKeyChecking=no'"
+            % (final_kwargs["key_filename"], final_kwargs["port"]),
+            "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
+            local_path,
+        ]
+
     return " ".join(cmd)
 
 
