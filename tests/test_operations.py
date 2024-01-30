@@ -672,6 +672,20 @@ def test_rsync_upload_command():
         assert expected == actual
 
 
+def test_rsync_upload_command_ipv6():
+    "rsync invocations are generated correctly for ipv6"
+    expected = "rsync --ipv6 --rsh='ssh -6 -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' /local/foo elife@[::1/128]:/remote/bar"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "::1/128",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_upload("/local/foo", "/remote/bar")
+        assert expected == actual
+
+
 def test_rsync_download_command():
     "rsync invocations are generated correctly"
     expected = "rsync --rsh='ssh -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' elife@1.2.3.4:/remote/bar /local/foo"
@@ -679,6 +693,20 @@ def test_rsync_download_command():
         "user": "elife",
         "port": 23,
         "host_string": "1.2.3.4",
+        "key_filename": "/example/path/id_rsa",
+    }
+    with state.settings(**settings):
+        actual = operations._rsync_download("/remote/bar", "/local/foo")
+        assert expected == actual
+
+
+def test_rsync_download_command_ipv6():
+    "rsync invocations are generated correctly for ipv6"
+    expected = "rsync --ipv6 --rsh='ssh -6 -i /example/path/id_rsa -p 23 -o StrictHostKeyChecking=no' elife@[::1/128]:/remote/bar /local/foo"
+    settings = {
+        "user": "elife",
+        "port": 23,
+        "host_string": "::1/128",
         "key_filename": "/example/path/id_rsa",
     }
     with state.settings(**settings):
