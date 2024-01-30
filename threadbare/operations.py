@@ -629,14 +629,13 @@ def _rsync_upload(local_path, remote_path, **kwargs):
             "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
         ]
     else:
-        host_string = "[%s]" % host_string
         cmd = [
             "rsync",
             "--ipv6",
             "--rsh='ssh -6 -i %s -p %s -o StrictHostKeyChecking=no'"
             % (final_kwargs["key_filename"], final_kwargs["port"]),
             local_path,
-            "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
+            "%s@[%s]:%s" % (final_kwargs["user"], host_string, remote_path),
         ]
 
     return " ".join(cmd)
@@ -673,13 +672,12 @@ def _rsync_download(remote_path, local_path, **kwargs):
             local_path,
         ]
     else:
-        host_string = "[%s]" % host_string
         cmd = [
             "rsync",
             "--ipv6",
             "--rsh='ssh -6 -i %s -p %s -o StrictHostKeyChecking=no'"
             % (final_kwargs["key_filename"], final_kwargs["port"]),
-            "%s@%s:%s" % (final_kwargs["user"], host_string, remote_path),
+            "%s@[%s]:%s" % (final_kwargs["user"], host_string, remote_path),
             local_path,
         ]
 
