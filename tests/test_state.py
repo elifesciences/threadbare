@@ -6,6 +6,7 @@ import copy
 # lsh@2019-12: careful manipulation of global state is how Fabric does most of it's magic.
 # it's not pretty, often hard to reason about and may lead to weird behaviour if you're not careful.
 
+
 # every test gets a @reset
 # if a test fails for whatever reason, it may leave the other tests in an unknown state
 # inverse is also true. a subsequent test may end up relying on the successful modification in previous test

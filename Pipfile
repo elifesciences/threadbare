@@ -16,5 +16,5 @@ pytest = "*"
 pytest-cov = "*"
 pdoc3 = "*"
 pyflakes = "*"
-black = "==22.6.0"
+black = "*"
 

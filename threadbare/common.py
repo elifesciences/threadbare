@@ -58,6 +58,7 @@ def cwd():
 
 # utils
 
+
 # direct copy from Fabric:
 # https://github.com/mathiasertl/fabric/blob/master/fabric/operations.py#L33-L46
 def _shell_escape(string):
