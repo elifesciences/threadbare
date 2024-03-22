@@ -13,7 +13,8 @@ LOG = logging.getLogger(__name__)
 def serial(func, pool_size=None):
     """Forces the given function to run `pool_size` times.
     when pool_size is None (default), executor decides how many instances of `func` to execute (1, probably).
-    if set and executor is given a set of values to use instead, `pool_size` is ignored"""
+    if set and executor is given a set of values to use instead, `pool_size` is ignored
+    """
 
     def inner(*args, **kwargs):
         return func(*args, **kwargs)
@@ -181,7 +182,8 @@ def execute(func, param_key=None, param_values=None, raise_unhandled_errors=True
     parent process blocks until all child processes have completed.
     returns a map of execution data with the return values of the individual executions available under 'result'.
 
-    when `raise_unhandled_errors` is `True` (default), the first result that is an exception will be re-raised."""
+    when `raise_unhandled_errors` is `True` (default), the first result that is an exception will be re-raised.
+    """
 
     # in Fabric, `execute` is a guard-type function that ensures the function and the function's environment is
     # correct before passing it to `_execute` that does the actual magic.

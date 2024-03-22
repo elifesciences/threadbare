@@ -57,7 +57,8 @@ _test_settings = partial(
 
 def _env_fixture(prefix):
     """creates a temporary directory with three files in it, 'small-file', 'medium-file' and 'large-file'.
-    the paths to the directory and files are yielded as a map and then all is removed afterwards."""
+    the paths to the directory and files are yielded as a map and then all is removed afterwards.
+    """
 
     @contextlib.contextmanager
     def wrapper():
@@ -263,7 +264,8 @@ def test_run_a_remote_command_with_shell_interpolation():
 
 def test_run_a_remote_command_non_zero_return_code():
     """`remote` commands, like `local` commands, will raise a RuntimeError if the command they execute fails.
-    the results of the command are still available via the `result` attribute on the exception object"""
+    the results of the command are still available via the `result` attribute on the exception object
+    """
     with _test_settings():
         with pytest.raises(RuntimeError) as err:
             remote("exit 123")
@@ -275,7 +277,8 @@ def test_run_a_remote_command_non_zero_return_code():
 
 def test_run_a_remote_command_non_zero_custom_exit():
     """`remote` commands, like `local` commands, may raise a custom exception if the command they execute fails.
-    the results of the command are still available via the `result` attribute on the exception object"""
+    the results of the command are still available via the `result` attribute on the exception object
+    """
     with _test_settings():
         with pytest.raises(ValueError) as err:
             remote("exit 123", abort_exception=ValueError)
@@ -344,7 +347,8 @@ def test_run_many_remote_commands_serially():
 def test_run_many_remote_commands_in_parallel():
     """run a list of `remote` commands in parallel.
     `remote` commands run in parallel do not share a ssh connection.
-    the order of results can be guaranteed but not the order in which output is emitted"""
+    the order of results can be guaranteed but not the order in which output is emitted
+    """
     command_list = [
         "echo all",
         "echo these commands",

@@ -212,7 +212,8 @@ def _execute(command, user, key_filename, host_string, port, use_pty, timeout):
 def _print_line(output_pipe, line, **kwargs):
     """writes the given `line` (string) to the given `output_pipe` (file-like object)
     if `quiet` is True, `line` is *not* written to `output_pipe`.
-    if `discard_output` is True, `line` is *not* returned and output does *not* accumulate in memory."""
+    if `discard_output` is True, `line` is *not* returned and output does *not* accumulate in memory.
+    """
 
     base_kwargs = {
         "discard_output": False,
@@ -289,7 +290,8 @@ def _print_running(command, output_pipe, **kwargs):
 def abort(result, err_msg, **kwargs):
     """raises a `RuntimeError` with the given `err_msg` and the given `result` attached to it's `.result` property.
     issues a warning and returns the given `result` if `settings.warn_only` is `True`.
-    raises a SystemExit with a return code of `1` if `settings.abort_exception` is set to None."""
+    raises a SystemExit with a return code of `1` if `settings.abort_exception` is set to None.
+    """
     base_kwargs = {
         "quiet": False,
         "warn_only": False,
@@ -697,7 +699,8 @@ def rsync_download(remote_path, local_path, **kwargs):
 def _transfer_fn(client, direction, **kwargs):
     """returns the `client` object's appropriate transfer *method* given a `direction`.
     `direction` is either 'upload' or 'download'.
-    Also accepts the `transfer_protocol` keyword parameter that is either 'rsync' (default), 'scp' or 'sftp'."""
+    Also accepts the `transfer_protocol` keyword parameter that is either 'rsync' (default), 'scp' or 'sftp'.
+    """
     base_kwargs = {
         "overwrite": True,
         # sftp is *exceptionally* slow.
@@ -797,7 +800,8 @@ def _download_as_root_hack(remote_path, local_path, **kwargs):
     """as root, creates a temporary copy of the file that can be downloaded by a
     regular user and then removes the temporary file.
     warning: don't try to download anything huge `with_sudo` as the file is duplicated.
-    warning: the privileged file will be available in /tmp until the download is complete"""
+    warning: the privileged file will be available in /tmp until the download is complete
+    """
 
     if not remote_file_exists(remote_path, use_sudo=True, **kwargs):
         raise EnvironmentError("remote file does not exist: %s" % (remote_path,))
@@ -934,7 +938,8 @@ def _upload_as_root_hack(local_path, remote_path, **kwargs):
 
 def _write_bytes_to_temporary_file(local_path):
     """if `local_path` is a file-like object, write the contents to an *actual* file and
-    return a pair of new local filename and a function that removes the temporary file when called."""
+    return a pair of new local filename and a function that removes the temporary file when called.
+    """
     if hasattr(local_path, "read"):
         # `local_path` is a file-like object
         local_bytes = local_path

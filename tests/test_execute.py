@@ -340,7 +340,8 @@ def test_parallel_with_prompts_custom__swallow_errors():
 
 def test_execute_with_prompts_override__raise_errors():
     """prompts issued while executing a worker function in parallel with `abort_on_prompts` set to `False` will get the unsupported `EOFError` raised.
-    When `raise_unhandled_errors` is set to `True` (default) the `EOFError` will be re-thrown."""
+    When `raise_unhandled_errors` is set to `True` (default) the `EOFError` will be re-thrown.
+    """
 
     @execute.parallel
     def workerfn():
@@ -355,7 +356,8 @@ def test_execute_with_prompts_override__raise_errors():
 
 def test_execute_with_prompts_override__swallow_errors():
     """prompts issued while executing a worker function in parallel with `abort_on_prompts` set to `False` will get the unsupported `EOFError` raised.
-    When `raise_unhandled_errors` is set to `False` the `EOFError` is available in the results."""
+    When `raise_unhandled_errors` is set to `False` the `EOFError` is available in the results.
+    """
 
     @execute.parallel
     def workerfn():
