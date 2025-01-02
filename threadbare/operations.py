@@ -7,7 +7,7 @@ from threading import Timer
 import getpass
 import pssh.exceptions
 import os, sys
-from pssh.clients.native import SSHClient as PSSHClient
+from pssh.clients.ssh import SSHClient as PSSHClient
 import gevent
 import io
 import logging
