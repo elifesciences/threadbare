@@ -1,5 +1,5 @@
 # file generated 2024-03-22 - see update-dependencies.sh
-black==24.3.0
+black==24.10.0
 click==8.1.7
 coverage==7.4.4
 exceptiongroup==1.2.0
