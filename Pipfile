@@ -9,7 +9,7 @@ python_version = "3.8"
 # note! remember to update setup.py
 [packages]
 # is not semver
-parallel-ssh = "==2.12.*"
+parallel-ssh = "==2.16.*"
 
 [dev-packages]
 pytest = "*"
